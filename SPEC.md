@@ -44,7 +44,7 @@ name evokes. This is a **presentation-layer decision only** — see §3; the
 backend stays Domain-Driven regardless of the surface grammar.
 
 ```
-unifictl set lag off                    # dissolve the node LAG(s) for PXE
+unifictl set lag off                    # dissolve the LAG(s) on the leader ports
 unifictl set lag on                     # restore the LACP bond(s)
 unifictl set lag off --dry-run          # print computed change, write nothing
 unifictl set lag off --switch <mac>     # override the configured switch

@@ -35,11 +35,10 @@ def lag(
     dry_run: bool = False,
     yes: bool = False,
 ) -> None:
-    """Break or restore LACP link aggregation so cluster nodes can PXE boot.
+    """Break or restore LACP link aggregation on a switch's leader ports.
 
     Args:
-        state: ``off`` dissolves the LAGs (nodes PXE as plain access ports);
-            ``on`` restores the LACP bonds.
+        state: ``off`` dissolves the LAGs; ``on`` restores the LACP bonds.
         switch: MAC of the switch; falls back to config/env when omitted.
         leader: LAG leader port(s), e.g. ``--leader 17,19,21`` or repeated
             ``--leader`` flags; falls back to config when omitted.

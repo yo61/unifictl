@@ -3,8 +3,7 @@
 Imperative UniFi homelab actions that the official Integration API can't
 express. Companion to [`unifi-mcp`](https://github.com/yo61/unifi-mcp) (reads):
 same gateway, same API key, but `unifictl` hits the private controller API to
-*do* things — starting with toggling switch-port link aggregation around
-PXE-booting cluster nodes.
+*do* things — starting with toggling switch-port link aggregation (LACP LAGs).
 
 > **Status: `set lag` implemented.** The first feature works end-to-end against
 > the private controller API (API-key auth). See `SPEC.md` for the design and
@@ -19,7 +18,7 @@ uv tool install unifictl        # or: pipx install unifictl
 ## Usage
 
 ```sh
-unifictl set lag off            # dissolve the LAGs so nodes can PXE boot
+unifictl set lag off            # dissolve the LAGs on the leader ports
 unifictl set lag on             # restore the LACP bonds
 unifictl set lag off --dry-run  # print the computed change, apply nothing
 ```
