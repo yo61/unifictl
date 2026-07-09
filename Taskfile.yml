@@ -1,0 +1,60 @@
+version: "3"
+silent: true
+
+env:
+  UV_FROZEN: "1"
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  dev:lint:
+    desc: Run ruff check
+    cmds:
+      - uv run ruff check src tests
+
+  dev:fmt:
+    desc: Apply ruff format
+    cmds:
+      - uv run ruff format src tests
+
+  dev:fmt-check:
+    desc: Check formatting without rewriting
+    cmds:
+      - uv run ruff format --check src tests
+
+  dev:typecheck:
+    desc: Run ty type checker
+    cmds:
+      - uv run ty check src
+
+  dev:imports:
+    desc: Enforce import boundaries (import-linter)
+    cmds:
+      - uv run lint-imports
+
+  dev:test:
+    desc: Run the pytest suite
+    cmds:
+      - uv run pytest
+
+  dev:check:
+    desc: Full quality gate — lint, format-check, typecheck, imports, tests
+    cmds:
+      - task: dev:lint
+      - task: dev:fmt-check
+      - task: dev:typecheck
+      - task: dev:imports
+      - task: dev:test
+
+  dev:hooks:
+    desc: Run all prek hooks against every file
+    cmds:
+      - prek run --all-files
+
+  dev:hooks-install:
+    desc: Install git hooks (pre-commit, commit-msg, pre-push)
+    cmds:
+      - prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push

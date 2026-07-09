@@ -1,0 +1,61 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Whitespace / line endings
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      # File integrity
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      # Parseable config
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+
+  # ruff, ty, import-linter, and pytest run via `uv run` so their versions are
+  # single-sourced from uv.lock — the same binaries CI runs via `task dev:check`.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --no-sync ruff check --fix
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --no-sync ruff format
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: ty
+        name: ty type check
+        entry: uv run --no-sync ty check src
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: import-linter
+        name: import-linter
+        entry: uv run --no-sync lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: uv run --no-sync pytest -q
+        language: system
+        stages: [pre-push]
+        types: [python]
+        pass_filenames: false
+
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.26.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies:
+          - "@commitlint/config-conventional@^21.1.0"
