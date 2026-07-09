@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from unifictl.domain.aggregation import apply_aggregation
 from unifictl.domain.models import PortOverride
+from unifictl.infrastructure.backup import write_snapshot
 from unifictl.infrastructure.client import UnifiClient
 
 
@@ -41,4 +43,11 @@ def set_aggregation(
     Returns:
         The before/after arrays, whether it was applied, and the backup path.
     """
-    raise NotImplementedError("implement test-first — see SPEC.md §3 and §6")
+    device = client.get_device(switch_mac)
+    before: list[PortOverride] = device["port_overrides"]
+    after = apply_aggregation(before, leader_ports, num_ports, enable=enable)
+    if dry_run:
+        return AggregationResult(switch_mac, before, after, applied=False, backup_path=None)
+    backup_path = write_snapshot(switch_mac, before)
+    client.put_port_overrides(device["_id"], after)
+    return AggregationResult(switch_mac, before, after, applied=True, backup_path=str(backup_path))
