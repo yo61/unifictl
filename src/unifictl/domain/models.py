@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 PortOverride = dict[str, Any]
 """A single entry in a device's ``port_overrides`` array, keyed by ``port_idx``."""
 
 
-class PortRole(str, Enum):
+class PortRole(StrEnum):
     """Whether a port leads a LAG, is a member of one, or is standalone."""
 
     LEADER = "leader"

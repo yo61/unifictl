@@ -10,7 +10,12 @@ from hypothesis import strategies as st
 from unifictl.domain.models import PortRole
 from unifictl.domain.ports import describe_port
 
-LEADER_17 = {"port_idx": 17, "op_mode": "aggregate", "aggregate_members": [17, 18], "name": "Port 17"}
+LEADER_17 = {
+    "port_idx": 17,
+    "op_mode": "aggregate",
+    "aggregate_members": [17, 18],
+    "name": "Port 17",
+}
 
 
 def test_leader_is_reported_as_leader() -> None:
