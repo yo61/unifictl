@@ -25,11 +25,12 @@ def main() -> None:
     failures (:class:`UnifiClientError`) are converted to a single stderr line
     rather than a traceback.
     """
+    from unifictl.application.device_service import PortNotFoundError
     from unifictl.infrastructure.client import UnifiClientError
     from unifictl.infrastructure.config import ConfigError
 
     try:
         app()
-    except (ConfigError, UnifiClientError) as exc:
+    except (ConfigError, UnifiClientError, PortNotFoundError) as exc:
         print(f"unifictl: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
