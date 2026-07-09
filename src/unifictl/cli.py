@@ -21,17 +21,15 @@ def main() -> None:
     """Entry point: dispatch to cyclopts, mapping known errors to clean exits.
 
     Cyclopts raises ``SystemExit`` for ``--help``/``--version`` and usage
-    errors. Configuration problems surface as :class:`ConfigError`; unbuilt
-    scaffold commands raise ``NotImplementedError`` — both are converted to a
-    single stderr line rather than a traceback.
+    errors. Configuration problems (:class:`ConfigError`) and private-API
+    failures (:class:`UnifiClientError`) are converted to a single stderr line
+    rather than a traceback.
     """
+    from unifictl.infrastructure.client import UnifiClientError
     from unifictl.infrastructure.config import ConfigError
 
     try:
         app()
-    except ConfigError as exc:
+    except (ConfigError, UnifiClientError) as exc:
         print(f"unifictl: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
-    except NotImplementedError as exc:
-        print(f"unifictl: not yet implemented: {exc}", file=sys.stderr)
-        raise SystemExit(2) from exc

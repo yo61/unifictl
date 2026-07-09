@@ -7,6 +7,7 @@ import sys
 import pytest
 
 from unifictl.cli import app, main
+from unifictl.infrastructure.config import ConfigError
 
 
 def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -22,13 +23,17 @@ def test_set_lag_help_exits_zero() -> None:
     assert exc.value.code == 0
 
 
-def test_set_lag_is_stubbed() -> None:
-    with pytest.raises(NotImplementedError):
+def test_set_lag_without_config_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("UNIFI_BASE_URL", raising=False)
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
+    with pytest.raises(ConfigError):
         app(["set", "lag", "off"])
 
 
-def test_main_maps_notimplemented_to_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_maps_config_error_to_exit_1(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("UNIFI_BASE_URL", raising=False)
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
     monkeypatch.setattr(sys, "argv", ["unifictl", "set", "lag", "off"])
     with pytest.raises(SystemExit) as exc:
         main()
-    assert exc.value.code == 2
+    assert exc.value.code == 1

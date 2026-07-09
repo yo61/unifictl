@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from typing import Literal
 
+import questionary
 from cyclopts import App
+from rich.console import Console
+
+from unifictl.application.lag_service import AggregationResult, set_aggregation
+from unifictl.infrastructure.client import UnifiClient
+from unifictl.infrastructure.config import ConfigError, load_settings
 
 app = App(name="set", help="Set a property on a UniFi device.")
+_console = Console()
 
 
 @app.command(name="lag")
@@ -16,7 +23,7 @@ def lag(
     *,
     switch: str | None = None,
     ports: list[int] | None = None,
-    num_ports: int = 2,
+    num_ports: int | None = None,
     dry_run: bool = False,
     yes: bool = False,
 ) -> None:
@@ -27,8 +34,49 @@ def lag(
             ``on`` restores the LACP bonds.
         switch: MAC of the switch; falls back to config/env when omitted.
         ports: LAG leader port(s); falls back to config when omitted.
-        num_ports: Ports per LAG (2-8).
+        num_ports: Ports per LAG (2-8); falls back to config when omitted.
         dry_run: Print the computed ``port_overrides`` change without applying.
         yes: Skip the confirmation prompt. A backup is still written.
     """
-    raise NotImplementedError("implement test-first — see SPEC.md §2 and §6")
+    enable = state == "on"
+    settings = load_settings()
+    switch_mac = switch or settings.switch
+    if not switch_mac:
+        raise ConfigError("no switch specified; pass --switch or set 'switch' in config")
+    leader_ports = list(ports) if ports else list(settings.ports)
+    if not leader_ports:
+        raise ConfigError("no LAG leader ports; pass --ports or set 'ports' in config")
+    resolved_num = num_ports if num_ports is not None else settings.num_ports
+
+    client = UnifiClient(settings)
+    try:
+        preview = set_aggregation(
+            client, switch_mac, leader_ports, resolved_num, enable=enable, dry_run=True
+        )
+        _show_diff(preview, enable=enable)
+        if dry_run:
+            _console.print("[dim]dry-run: nothing applied[/dim]")
+            return
+        if not yes and not _confirm():
+            _console.print("aborted; nothing applied")
+            return
+        result = set_aggregation(
+            client, switch_mac, leader_ports, resolved_num, enable=enable, dry_run=False
+        )
+        _console.print(f"applied; backup written to {result.backup_path}")
+    finally:
+        client.close()
+
+
+def _confirm() -> bool:
+    return bool(questionary.confirm("Apply this change to the switch?", default=False).ask())
+
+
+def _show_diff(result: AggregationResult, *, enable: bool) -> None:
+    action = "form LAG(s)" if enable else "dissolve LAG(s)"
+    _console.print(f"[bold]{result.switch_mac}[/bold]: {action}")
+    before = {override.get("port_idx"): override for override in result.before}
+    for override in result.after:
+        idx = override.get("port_idx")
+        if idx not in before or before[idx] != override:
+            _console.print(f"  port {idx}: {before.get(idx)} -> {override}")
