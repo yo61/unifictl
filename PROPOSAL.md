@@ -16,13 +16,15 @@ with the existing `unifi-mcp`). Short alias TBD — cf. jobhound's `jh`.
 - **`unifi-mcp`** already covers the *read* side via the official **Integration
   API** (`/proxy/network/integration/v1`), OpenAPI-driven, read-only for now.
 - The LAG toggle is a **write to per-port `port_overrides`**, which is **not in
-  the Integration API** — and won't be covered by unifi-mcp's future gated
-  writes either, because the field simply isn't in that API surface. It lives
-  only on the **private/session controller API**
-  (`/proxy/network/api/s/<site>/rest/device/<id>`).
+  the Integration API** — it lives only on the **private/legacy session
+  controller API** (`/proxy/network/api/s/<site>/rest/device/<id>`).
+- `unifi-mcp` plans to reach that legacy API too, but for **reads**. So the line
+  between the two tools is *reads vs. imperative actions*, not *which API each
+  one touches* — both end up speaking the legacy API. Reads → `unifi-mcp`;
+  actions → `unifictl`.
 - So `unifictl` is the imperative companion to `unifi-mcp`: same gateway, same
   API key, but it hits the private API to *do* things the Integration API can't
-  describe. Reads → `unifi-mcp`; actions → `unifictl`.
+  describe.
 
 ## First feature: `lag`
 
@@ -95,11 +97,43 @@ httpx, rich, xdg-base-dirs, tomli-w; ruff (line-length 100, double quotes,
 (`dev:lint|fmt|typecheck|test|check`), pre-commit, commitlint, release-please,
 mise, `decisions/`, `docs/`, `[project.scripts]` entrypoint.
 
-## First ADR to capture
+## Shared library with `unifi-mcp`
 
-"Use the private session API for `port_overrides` because the official
-Integration API (used by `unifi-mcp`) does not expose per-port aggregation."
-Records why unifictl is deliberately *not* just another Integration API client.
+Once `unifi-mcp` also speaks the legacy REST API, the client code stops being
+unifictl-specific: connection + `UNIFI_*` settings, API-key/session auth,
+TLS/CA handling, timeouts, and the read-modify-write device primitives are
+identical on both sides. That overlap is exact enough to justify a **shared
+library** (working name `unifi-core`, TBD) that both tools depend on.
+
+- **In the library** — `UnifiClient` (httpx): settings, auth, TLS/CA, and the
+  low-level Integration + legacy REST calls; plus shared `Device` /
+  `PortOverride` models.
+- **Stays in `unifictl`** — the LAG domain rule (the pure `port_overrides`
+  transform), the `set_aggregation` use-case, and the cyclopts `lag` command.
+- **Stays in `unifi-mcp`** — the MCP server, tool definitions, read models.
+
+**Minimum commitment now: keep the client isolated so the shared library can be
+swapped in later.** The `infrastructure/` layer already draws that boundary —
+build unifictl's own `UnifiClient` there as a self-contained module (settings +
+auth + HTTP + shared models) with no domain/application code leaking in, behind
+an interface the rest of the app depends on. Then extracting it into
+`unifi-core` — or swapping in unifi-mcp's version — is a *move*, not a rewrite.
+
+Defer the actual extraction until `unifi-mcp`'s legacy-API work is concrete
+enough to pin the shared surface: a third package adds cross-repo version
+coordination and a release step the single-repo plan avoids, so it's only worth
+paying once the interface is stable on both sides.
+
+## ADRs to capture
+
+1. "Use the private/legacy session API for `port_overrides` because the official
+   Integration API (used by `unifi-mcp`) does not expose per-port aggregation."
+   Records why unifictl is deliberately *not* just another Integration API
+   client.
+2. "Isolate the UniFi client behind the `infrastructure/` boundary so it can be
+   extracted into a shared `unifi-core` library once `unifi-mcp` adopts the
+   legacy REST API." Records the reads-vs-actions split and the deferred
+   extraction.
 
 ## Deferred — Terraform for steady state
 
@@ -119,6 +153,9 @@ Not on the critical path now.
 - `lag set on|off` (sub-app) vs a flatter action verb, per jobhound's
   action-based style.
 - Distribution: `uv tool` / `pipx` vs a Homebrew formula in `yo61/tap`.
+- Shared library timing: extract `unifi-core` up front, or ship unifictl's own
+  isolated `UnifiClient` first and extract once `unifi-mcp`'s legacy-REST work
+  pins the shared surface (recommended — keep the boundary, defer the package).
 
 ## Reference cyclopts sketch (starting point, not final)
 
