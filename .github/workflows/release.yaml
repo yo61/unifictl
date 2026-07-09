@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name:        ${{ steps.rp.outputs.tag_name }}
+      prs:             ${{ steps.rp.outputs.prs }}
+    steps:
+      # Mint a short-lived App token so PRs opened by release-please look like
+      # the semantic-release-pusher App rather than github-actions[bot], which
+      # lets `pull_request` workflow events fire on them. Without this, the
+      # Release PR has no CI checks and branch protection blocks the merge.
+      - id: create_token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        with:
+          client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ steps.create_token.outputs.token }}
+
+  # Keep uv.lock in sync with pyproject.toml's version on every release-please
+  # PR. release-please-action only updates pyproject.toml and CHANGELOG.md, so
+  # without this job the unifictl editable pin in uv.lock drifts and the first
+  # `uv run` on main silently rewrites it. A comment-based `extra-files` entry
+  # can't fix this — `uv lock` strips comments — so we run `uv lock` against
+  # the release PR branch and push the result back.
+  sync-lockfile:
+    needs: release-please
+    if: needs.release-please.outputs.prs && needs.release-please.outputs.prs != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - id: create_token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        with:
+          client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - id: pr_branch
+        env:
+          PRS_JSON: ${{ needs.release-please.outputs.prs }}
+        run: |
+          set -euo pipefail
+          branch=$(printf '%s' "$PRS_JSON" | jq -r '.[0].headBranchName')
+          if [[ -z "$branch" || "$branch" == "null" ]]; then
+            echo "release-please did not report a head branch; skipping" >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.pr_branch.outputs.skip != 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ steps.pr_branch.outputs.branch }}
+          token: ${{ steps.create_token.outputs.token }}
+          persist-credentials: true
+      - if: steps.pr_branch.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: "3.11"
+          enable-cache: false
+      - if: steps.pr_branch.outputs.skip != 'true'
+        name: Sync uv.lock and commit (signed) if changed
+        env:
+          UV_FROZEN: "0"
+          GH_TOKEN: ${{ steps.create_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ steps.pr_branch.outputs.branch }}
+        # Use the GraphQL createCommitOnBranch mutation rather than
+        # `git commit`/`git push`. Commits created via the GitHub API on
+        # an App's behalf are signed by GitHub's app-flow key, which the
+        # `required_signatures` ruleset on `main` requires. A plain
+        # `git commit` from the runner produces an unsigned commit
+        # because no GPG key is provisioned, which blocks the release PR.
+        run: |
+          set -euo pipefail
+          uv lock
+          if [[ -z "$(git status --porcelain uv.lock)" ]]; then
+            echo "uv.lock already in sync"
+            exit 0
+          fi
+          head_sha=$(git rev-parse HEAD)
+          base64 -w0 < uv.lock > /tmp/uv.lock.b64
+          # shellcheck disable=SC2016 # jq references, not shell expansions.
+          query='mutation($repo: String!, $branch: String!, $sha: GitObjectID!, $content: Base64String!) {
+            createCommitOnBranch(input: {
+              branch: { repositoryNameWithOwner: $repo, branchName: $branch },
+              message: { headline: "chore: sync uv.lock with version bump" },
+              expectedHeadOid: $sha,
+              fileChanges: { additions: [{ path: "uv.lock", contents: $content }] }
+            }) {
+              commit { url }
+            }
+          }'
+          jq -n \
+            --arg query "$query" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$BRANCH" \
+            --arg sha "$head_sha" \
+            --rawfile content /tmp/uv.lock.b64 \
+            '{
+              query: $query,
+              variables: {
+                repo: $repo,
+                branch: $branch,
+                sha: $sha,
+                content: ($content | rtrimstr("\n"))
+              }
+            }' > /tmp/graphql.json
+          gh api graphql --input /tmp/graphql.json
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/unifictl
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: "3.11"
+          enable-cache: false
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
+
+  # Tell the yo61/homebrew-tap repo to bump its unifictl formula to the
+  # version we just published to PyPI. The tap's `bump-unifictl` workflow
+  # regenerates resources, validates locally, and opens a PR.
+  #
+  # Requires the `semantic-release-pusher` GitHub App to be installed on
+  # yo61/homebrew-tap so the App token can mint with `contents:write` for
+  # the dispatches endpoint. Without it, `create_token` returns 404/403
+  # and this job goes red — release itself is unaffected (publish has
+  # already shipped to PyPI), and the tap workflow can be triggered
+  # manually via workflow_dispatch as a fallback.
+  dispatch-homebrew:
+    needs: [release-please, publish]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - id: create_token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        with:
+          client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+          permission-contents: write
+      # PyPI's JSON index lags `uv publish` by tens of seconds, so the bump
+      # workflow on the tap side would 404 if we dispatch the moment publish
+      # returns. Wait until the sdist URL is actually fetchable from the JSON
+      # endpoint before announcing the new version.
+      - name: Wait for PyPI to index sdist
+        env:
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+          deadline=$(( $(date +%s) + 300 ))
+          until curl -fsS "https://pypi.org/pypi/unifictl/${version}/json" 2>/dev/null \
+              | jq -e '.urls[] | select(.packagetype == "sdist") | .url' >/dev/null 2>&1; do
+            if (( $(date +%s) > deadline )); then
+              echo "::error::PyPI did not index unifictl==${version} sdist within 300s"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "PyPI has unifictl==${version} sdist"
+
+      - name: Dispatch bump to homebrew-tap
+        env:
+          GH_TOKEN: ${{ steps.create_token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh api -X POST "repos/$OWNER/homebrew-tap/dispatches" \
+            -f event_type=bump-unifictl \
+            -F "client_payload[version]=$TAG_NAME"
