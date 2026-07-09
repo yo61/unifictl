@@ -14,6 +14,10 @@ import httpx
 from unifictl.infrastructure.config import Settings
 
 
+class UnifiClientError(RuntimeError):
+    """Raised when a private-API call fails or returns no usable data."""
+
+
 class UnifiClient:
     """Talks to the private controller API using ``X-API-KEY`` auth."""
 
@@ -34,8 +38,17 @@ class UnifiClient:
 
         Returns:
             The device object as returned by ``stat/device/<mac>``.
+
+        Raises:
+            UnifiClientError: if the request fails or no device matches ``mac``.
         """
-        raise NotImplementedError("implement test-first — see SPEC.md §6")
+        path = f"/proxy/network/api/s/{self._settings.site}/stat/device/{mac}"
+        response = self._send("GET", path)
+        devices = response.json().get("data", [])
+        if not devices:
+            raise UnifiClientError(f"no device found with mac {mac}")
+        device: dict[str, Any] = devices[0]
+        return device
 
     def put_port_overrides(self, device_id: str, port_overrides: list[dict[str, Any]]) -> None:
         """PUT the full ``port_overrides`` array back to the device.
@@ -43,8 +56,20 @@ class UnifiClient:
         Args:
             device_id: The device ``_id`` from :meth:`get_device`.
             port_overrides: The complete, modified ``port_overrides`` array.
+
+        Raises:
+            UnifiClientError: if the request fails.
         """
-        raise NotImplementedError("implement test-first — see SPEC.md §6")
+        path = f"/proxy/network/api/s/{self._settings.site}/rest/device/{device_id}"
+        self._send("PUT", path, json={"port_overrides": port_overrides})
+
+    def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        try:
+            response = self._client.request(method, path, **kwargs)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise UnifiClientError(f"{method} {path} failed: {exc}") from exc
+        return response
 
     def close(self) -> None:
         """Close the underlying HTTP connection pool."""
