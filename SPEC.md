@@ -48,7 +48,7 @@ unifictl set lag off                    # dissolve the node LAG(s) for PXE
 unifictl set lag on                     # restore the LACP bond(s)
 unifictl set lag off --dry-run          # print computed change, write nothing
 unifictl set lag off --switch <mac>     # override the configured switch
-unifictl set lag on  --ports 11 --ports 13 --num-ports 2
+unifictl set lag on  --leader 17,19,21  # comma list (or repeated --leader flags)
 unifictl set lag off --yes              # skip the confirm prompt (backup still taken)
 ```
 
@@ -64,8 +64,7 @@ def lag(
     /,
     *,
     switch: str | None = None,      # switch MAC; falls back to config/env
-    ports: list[int] | None = None, # LAG leader ports; falls back to config
-    num_ports: int = 2,             # ports per LAG (valid 2–8, contiguous from leader)
+    leader: list[int] | None = None, # LAG leader ports (comma or repeated); falls back to config
     dry_run: bool = False,
     yes: bool = False,              # skip confirmation; backup is still written
 ) -> None:
@@ -104,7 +103,7 @@ src/unifictl/
   application/
     lag_service.py           # set_aggregation() use-case: fetch → transform → backup → apply
   domain/
-    aggregation.py           # PURE transform + rules (op_mode, num_ports 2–8). No I/O.
+    aggregation.py           # PURE op_mode-flip transform on leader ports. No I/O.
     models.py                # Device / PortOverride value objects
   infrastructure/
     client.py                # UnifiClient (httpx) — isolated, no domain/app imports
@@ -116,10 +115,10 @@ tests/                       # mirrors package structure
 ### Layer responsibilities
 
 - **domain/** — pure model + rules, no I/O. `apply_aggregation(overrides,
-  leader_ports, num_ports, enable) -> new_overrides` returns a new
-  `port_overrides` array. Enforces: change only the target leader ports,
-  preserve every other override untouched, `num_ports` in 2–8. Unit/property
-  tested with hypothesis.
+  leader_ports, *, enable) -> new_overrides` returns a new `port_overrides`
+  array. Enforces: flip only each leader's `op_mode`, preserve every other field
+  and override untouched, raise `UnknownLeaderError` for an unknown leader.
+  Unit/property tested with hypothesis.
 - **application/** — `set_aggregation(...)` orchestrates fetch (client) →
   transform (domain) → snapshot (backup) → apply (client), plus the `--dry-run`
   short-circuit. Returns a result carrying before/after/diff for the adapter to
@@ -170,8 +169,8 @@ sources, so secrets never surface in `--help`.
   - `UNIFI_INSECURE_TLS` — last-resort TLS bypass (off by default)
   - `UNIFI_TIMEOUT_MS`, `UNIFI_SITE` (default `default`)
 - **Operational params — XDG TOML (`~/.config/unifictl/config.toml`), safe to
-  commit an example:** switch MAC, leader ports, ports-per-LAG. Resolution
-  order: explicit flag > env > TOML > built-in default.
+  commit an example:** switch MAC (`switch`) and LAG leader ports (`leaders`).
+  Resolution order: explicit flag > env > TOML > built-in default.
 
 Auth: reuse `UNIFI_API_KEY` (`X-API-KEY` header) for the private endpoints.
 **Confirmed on a live UDM Pro** — the key authenticates both a `stat/device`
@@ -185,13 +184,22 @@ documented fallback only, to add if some future endpoint rejects the key.
 
 ### LAG domain rule (bake into `domain/aggregation.py`)
 
-- Aggregation is expressed on the LAG **leader** port only:
-  `op_mode = "aggregate"` + `aggregate_num_ports = N` (2–8; group is contiguous
-  from the leader). Breaking a LAG = set the leader's `op_mode = "switch"`;
-  members revert to normal switching.
+Verified against a live UDM Pro — see `decisions/2026-07-09-lag-toggle-model.md`.
+
+- A LAG lives entirely on its **leader** port's override: `op_mode: aggregate`
+  + `aggregate_members: [...]` (an explicit member list, any length) + a
+  **controller-managed** `lag_idx`. Member ports have no override of their own.
+- **Toggling is a pure `op_mode` flip on the leader.** `off` sets
+  `op_mode: switch` (members follow; `aggregate_members` persists dormant; the
+  controller drops `lag_idx`); `on` sets `op_mode: aggregate` (the controller
+  reforms from the persisted members and re-assigns `lag_idx`). The tool changes
+  **nothing but `op_mode`** — no `aggregate_num_ports`, no `num_ports`, no
+  `lag_idx`, no member editing.
+- Toggling a named leader that has no override raises `UnknownLeaderError` (it is
+  not a configured LAG; the tool toggles existing LAGs, it does not create them).
 - `port_overrides` is a **single array on the device**. There is no per-port
-  PATCH: GET the device, mutate only the target ports in that array, PUT the
-  whole array back. **Any omitted override resets to controller default — the
+  PATCH: GET the device, flip `op_mode` on the target leaders in that array, PUT
+  the whole array back. **Any omitted override resets to controller default — the
   array must be preserved.**
 
 ### Endpoints (private API, proxied under `/proxy/network`)
@@ -228,9 +236,10 @@ Tests in `tests/` mirroring the package. Test behavior, not implementation;
 cover edges and errors, not just the happy path.
 
 - **domain/ (hypothesis, pure):** properties of `apply_aggregation` — every
-  non-target override is preserved byte-for-byte; only leader ports change;
-  `on` then `off` returns the original array (round-trip); `off` is idempotent;
-  `num_ports` outside 2–8 raises. This is the highest-value test surface.
+  non-leader override is preserved byte-for-byte; a leader changes in **only**
+  its `op_mode`; applying twice equals once (idempotent); the input is never
+  mutated; an unknown leader raises `UnknownLeaderError`. This is the
+  highest-value test surface.
 - **application/:** `set_aggregation` with a mocked `UnifiClient` — asserts
   fetch → transform → apply ordering; `--dry-run` issues **no** PUT; the backup
   is written **before** the PUT; the returned diff matches.

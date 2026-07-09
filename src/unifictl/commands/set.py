@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Sequence
+from typing import Annotated, Any, Literal
 
 import questionary
-from cyclopts import App
+from cyclopts import App, Parameter
 from rich.console import Console
 
 from unifictl.application.lag_service import AggregationResult, set_aggregation
@@ -16,14 +17,21 @@ app = App(name="set", help="Set a property on a UniFi device.")
 _console = Console()
 
 
+def _split_leaders(type_: Any, tokens: Sequence[Any]) -> list[int]:
+    """Parse leader ports from comma-separated and/or repeated ``--leader`` tokens."""
+    ports: list[int] = []
+    for token in tokens:
+        ports.extend(int(part) for part in token.value.split(",") if part.strip())
+    return ports
+
+
 @app.command(name="lag")
 def lag(
     state: Literal["on", "off"],
     /,
     *,
     switch: str | None = None,
-    ports: list[int] | None = None,
-    num_ports: int | None = None,
+    leader: Annotated[list[int], Parameter(converter=_split_leaders)] | None = None,
     dry_run: bool = False,
     yes: bool = False,
 ) -> None:
@@ -33,8 +41,8 @@ def lag(
         state: ``off`` dissolves the LAGs (nodes PXE as plain access ports);
             ``on`` restores the LACP bonds.
         switch: MAC of the switch; falls back to config/env when omitted.
-        ports: LAG leader port(s); falls back to config when omitted.
-        num_ports: Ports per LAG (2-8); falls back to config when omitted.
+        leader: LAG leader port(s), e.g. ``--leader 17,19,21`` or repeated
+            ``--leader`` flags; falls back to config when omitted.
         dry_run: Print the computed ``port_overrides`` change without applying.
         yes: Skip the confirmation prompt. A backup is still written.
     """
@@ -43,16 +51,13 @@ def lag(
     switch_mac = switch or settings.switch
     if not switch_mac:
         raise ConfigError("no switch specified; pass --switch or set 'switch' in config")
-    leader_ports = list(ports) if ports else list(settings.ports)
+    leader_ports = list(leader) if leader else list(settings.leaders)
     if not leader_ports:
-        raise ConfigError("no LAG leader ports; pass --ports or set 'ports' in config")
-    resolved_num = num_ports if num_ports is not None else settings.num_ports
+        raise ConfigError("no LAG leader ports; pass --leader or set 'leaders' in config")
 
     client = UnifiClient(settings)
     try:
-        preview = set_aggregation(
-            client, switch_mac, leader_ports, resolved_num, enable=enable, dry_run=True
-        )
+        preview = set_aggregation(client, switch_mac, leader_ports, enable=enable, dry_run=True)
         _show_diff(preview, enable=enable)
         if dry_run:
             _console.print("[dim]dry-run: nothing applied[/dim]")
@@ -60,9 +65,7 @@ def lag(
         if not yes and not _confirm():
             _console.print("aborted; nothing applied")
             return
-        result = set_aggregation(
-            client, switch_mac, leader_ports, resolved_num, enable=enable, dry_run=False
-        )
+        result = set_aggregation(client, switch_mac, leader_ports, enable=enable, dry_run=False)
         _console.print(f"applied; backup written to {result.backup_path}")
     finally:
         client.close()

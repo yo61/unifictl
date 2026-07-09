@@ -12,9 +12,10 @@ from unifictl.application.lag_service import set_aggregation
 
 AGGREGATED = {
     "_id": "dev1",
-    "port_overrides": [{"port_idx": 11, "op_mode": "aggregate", "aggregate_num_ports": 2}],
+    "port_overrides": [{"port_idx": 11, "op_mode": "aggregate", "aggregate_members": [11, 12]}],
 }
-SWITCHED = [{"port_idx": 11, "op_mode": "switch"}]
+# Toggling flips only op_mode; aggregate_members is preserved.
+SWITCHED = [{"port_idx": 11, "op_mode": "switch", "aggregate_members": [11, 12]}]
 
 
 class FakeClient:
@@ -34,7 +35,7 @@ class FakeClient:
 def test_dry_run_computes_without_writing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     client = FakeClient({"_id": "dev1", "port_overrides": AGGREGATED["port_overrides"]})
-    result = set_aggregation(client, "70:aa", [11], 2, enable=False, dry_run=True)
+    result = set_aggregation(client, "70:aa", [11], enable=False, dry_run=True)
     assert result.applied is False
     assert result.backup_path is None
     assert result.after == SWITCHED
@@ -46,9 +47,9 @@ def test_apply_backs_up_before_array_and_puts_after(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    before = [{"port_idx": 11, "op_mode": "aggregate", "aggregate_num_ports": 2}]
+    before = [{"port_idx": 11, "op_mode": "aggregate", "aggregate_members": [11, 12]}]
     client = FakeClient({"_id": "dev1", "port_overrides": before})
-    result = set_aggregation(client, "70:aa", [11], 2, enable=False, dry_run=False)
+    result = set_aggregation(client, "70:aa", [11], enable=False, dry_run=False)
     assert result.applied is True
     assert result.backup_path is not None
     assert json.loads(Path(result.backup_path).read_text(encoding="utf-8")) == before
@@ -70,5 +71,5 @@ def test_backup_is_written_before_the_put(monkeypatch: pytest.MonkeyPatch, tmp_p
             super().put_port_overrides(device_id, port_overrides)
 
     client = OrderingClient({"_id": "dev1", "port_overrides": AGGREGATED["port_overrides"]})
-    set_aggregation(client, "70:aa", [11], 2, enable=True, dry_run=False)
+    set_aggregation(client, "70:aa", [11], enable=True, dry_run=False)
     assert events == ["backup", "put"]
