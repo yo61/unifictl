@@ -38,4 +38,26 @@ def apply_aggregation(
     Raises:
         ValueError: if ``num_ports`` is outside the valid range.
     """
-    raise NotImplementedError("implement test-first — see SPEC.md §4 and §6")
+    if not MIN_LAG_PORTS <= num_ports <= MAX_LAG_PORTS:
+        raise ValueError(
+            f"num_ports must be between {MIN_LAG_PORTS} and {MAX_LAG_PORTS}, got {num_ports}"
+        )
+    result: list[PortOverride] = [dict(override) for override in port_overrides]
+    by_idx = {override.get("port_idx"): override for override in result}
+    for leader in leader_ports:
+        override = by_idx.get(leader)
+        if enable:
+            if override is None:
+                override = _new_override(leader)
+                result.append(override)
+                by_idx[leader] = override
+            override["op_mode"] = "aggregate"
+            override["aggregate_num_ports"] = num_ports
+        elif override is not None:
+            override["op_mode"] = "switch"
+            override.pop("aggregate_num_ports", None)
+    return result
+
+
+def _new_override(port_idx: int) -> PortOverride:
+    return {"port_idx": port_idx}
