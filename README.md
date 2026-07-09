@@ -6,8 +6,9 @@ same gateway, same API key, but `unifictl` hits the private controller API to
 *do* things — starting with toggling switch-port link aggregation around
 PXE-booting cluster nodes.
 
-> **Status: scaffold.** The project structure, tooling, and CLI wiring are in
-> place; the `set lag` feature logic is stubbed and built next (see `SPEC.md`).
+> **Status: `set lag` implemented.** The first feature works end-to-end against
+> the private controller API (API-key auth). See `SPEC.md` for the design and
+> `decisions/` for the architecture decision records.
 
 ## Install
 
