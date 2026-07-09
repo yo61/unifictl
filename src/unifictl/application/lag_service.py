@@ -25,7 +25,6 @@ def set_aggregation(
     client: UnifiClient,
     switch_mac: str,
     leader_ports: list[int],
-    num_ports: int,
     *,
     enable: bool,
     dry_run: bool,
@@ -35,8 +34,7 @@ def set_aggregation(
     Args:
         client: The private-API client.
         switch_mac: MAC of the switch to modify.
-        leader_ports: LAG leader port indices.
-        num_ports: Ports per LAG.
+        leader_ports: LAG leader port indices to toggle.
         enable: ``True`` to form LAGs, ``False`` to dissolve them.
         dry_run: When ``True``, compute and return the change but write nothing.
 
@@ -45,7 +43,7 @@ def set_aggregation(
     """
     device = client.get_device(switch_mac)
     before: list[PortOverride] = device["port_overrides"]
-    after = apply_aggregation(before, leader_ports, num_ports, enable=enable)
+    after = apply_aggregation(before, leader_ports, enable=enable)
     if dry_run:
         return AggregationResult(switch_mac, before, after, applied=False, backup_path=None)
     backup_path = write_snapshot(switch_mac, before)

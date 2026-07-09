@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -17,8 +18,7 @@ def _settings(**overrides: Any) -> Settings:
         "api_key": "k",
         "site": "default",
         "switch": "70:aa",
-        "ports": (11,),
-        "num_ports": 2,
+        "leaders": (11,),
     }
     values.update(overrides)
     return Settings(**values)
@@ -41,7 +41,6 @@ class _Spy:
         client: Any,
         switch_mac: str,
         leader_ports: list[int],
-        num_ports: int,
         *,
         enable: bool,
         dry_run: bool,
@@ -50,7 +49,6 @@ class _Spy:
             {
                 "switch_mac": switch_mac,
                 "leader_ports": leader_ports,
-                "num_ports": num_ports,
                 "enable": enable,
                 "dry_run": dry_run,
             }
@@ -101,24 +99,30 @@ def test_apply_aborts_when_declined(spy: _Spy, monkeypatch: pytest.MonkeyPatch) 
     assert [c["dry_run"] for c in spy.calls] == [True]
 
 
-def test_flags_override_config(spy: _Spy, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(set_cmd, "load_settings", lambda: _settings(switch="cfg", ports=(1,)))
-    set_cmd.lag("on", switch="flagmac", ports=[7, 9], num_ports=4, yes=True)
+def test_flag_overrides_config(spy: _Spy, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(set_cmd, "load_settings", lambda: _settings(switch="cfg", leaders=(1,)))
+    set_cmd.lag("on", switch="flagmac", leader=[7, 9], yes=True)
     applied = spy.calls[-1]
     assert applied["switch_mac"] == "flagmac"
     assert applied["leader_ports"] == [7, 9]
-    assert applied["num_ports"] == 4
 
 
 def test_missing_switch_raises_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(set_cmd, "load_settings", lambda: _settings(switch=None))
     monkeypatch.setattr(set_cmd, "UnifiClient", _FakeClient)
     with pytest.raises(ConfigError, match="switch"):
-        set_cmd.lag("off", ports=[11])
+        set_cmd.lag("off", leader=[11])
 
 
-def test_missing_ports_raises_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(set_cmd, "load_settings", lambda: _settings(ports=()))
+def test_missing_leaders_raises_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(set_cmd, "load_settings", lambda: _settings(leaders=()))
     monkeypatch.setattr(set_cmd, "UnifiClient", _FakeClient)
-    with pytest.raises(ConfigError, match="port"):
+    with pytest.raises(ConfigError, match="leader"):
         set_cmd.lag("off", switch="70:aa")
+
+
+def test_leader_converter_parses_comma_and_repeated() -> None:
+    comma = [SimpleNamespace(value="17,19,21")]
+    repeated = [SimpleNamespace(value="17"), SimpleNamespace(value="19")]
+    assert set_cmd._split_leaders(None, comma) == [17, 19, 21]
+    assert set_cmd._split_leaders(None, repeated) == [17, 19]

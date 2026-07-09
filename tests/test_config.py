@@ -35,7 +35,7 @@ def test_env_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None
     assert settings.api_key == "secret"
     assert settings.site == "default"
     assert settings.insecure_tls is False
-    assert settings.ports == ()
+    assert settings.leaders == ()
 
 
 def test_toml_operational_params(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -43,21 +43,20 @@ def test_toml_operational_params(monkeypatch: pytest.MonkeyPatch, tmp_path) -> N
     cfg = tmp_path / "unifictl"
     cfg.mkdir()
     (cfg / "config.toml").write_text(
-        'switch = "70:a7:41:90:82:dd"\nports = [11, 13]\nnum_ports = 2\n',
+        'switch = "70:a7:41:90:82:dd"\nleaders = [17, 19, 21]\n',
         encoding="utf-8",
     )
     settings = load_settings()
     assert settings.switch == "70:a7:41:90:82:dd"
-    assert settings.ports == (11, 13)
-    assert settings.num_ports == 2
+    assert settings.leaders == (17, 19, 21)
 
 
-def test_toml_ports_wrong_type_raises(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_toml_leaders_wrong_type_raises(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     _base_env(monkeypatch, tmp_path)
     cfg = tmp_path / "unifictl"
     cfg.mkdir()
-    (cfg / "config.toml").write_text('ports = "11,13"\n', encoding="utf-8")
-    with pytest.raises(ConfigError, match="ports"):
+    (cfg / "config.toml").write_text('leaders = "17,19"\n', encoding="utf-8")
+    with pytest.raises(ConfigError, match="leaders"):
         load_settings()
 
 

@@ -16,7 +16,6 @@ from pathlib import Path
 from xdg_base_dirs import xdg_config_home
 
 DEFAULT_TIMEOUT_MS = 30000
-DEFAULT_NUM_PORTS = 2
 
 
 class ConfigError(RuntimeError):
@@ -34,8 +33,7 @@ class Settings:
     insecure_tls: bool = False
     timeout_ms: int = DEFAULT_TIMEOUT_MS
     switch: str | None = None
-    ports: tuple[int, ...] = ()
-    num_ports: int = DEFAULT_NUM_PORTS
+    leaders: tuple[int, ...] = ()
 
 
 def config_file_path() -> Path:
@@ -69,8 +67,7 @@ def load_settings() -> Settings:
         insecure_tls=_env_bool("UNIFI_INSECURE_TLS"),
         timeout_ms=_env_int("UNIFI_TIMEOUT_MS", DEFAULT_TIMEOUT_MS),
         switch=_toml_str(data, "switch"),
-        ports=_toml_ports(data),
-        num_ports=_toml_int(data, "num_ports", DEFAULT_NUM_PORTS),
+        leaders=_toml_leaders(data),
     )
 
 
@@ -108,22 +105,15 @@ def _toml_str(data: dict[str, object], key: str) -> str | None:
     return value
 
 
-def _toml_int(data: dict[str, object], key: str, default: int) -> int:
-    value = data.get(key, default)
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ConfigError(f"config.toml: {key} must be an integer, got {value!r}")
-    return value
-
-
-def _toml_ports(data: dict[str, object]) -> tuple[int, ...]:
-    value = data.get("ports")
+def _toml_leaders(data: dict[str, object]) -> tuple[int, ...]:
+    value = data.get("leaders")
     if value is None:
         return ()
     if not isinstance(value, list):
-        raise ConfigError(f"config.toml: ports must be a list of integers, got {value!r}")
-    ports: list[int] = []
+        raise ConfigError(f"config.toml: leaders must be a list of integers, got {value!r}")
+    leaders: list[int] = []
     for port in value:
         if isinstance(port, bool) or not isinstance(port, int):
-            raise ConfigError(f"config.toml: ports must be a list of integers, got {value!r}")
-        ports.append(port)
-    return tuple(ports)
+            raise ConfigError(f"config.toml: leaders must be a list of integers, got {value!r}")
+        leaders.append(port)
+    return tuple(leaders)
