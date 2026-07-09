@@ -31,7 +31,8 @@ controller API** to *do* things the Integration API can't describe.
    current full `port_overrides` array to a timestamped file **before** the PUT.
 4. The domain rule (the `port_overrides` transform) is pure and property-tested.
 5. The UniFi client is isolated in `infrastructure/` with no domain/application
-   imports, so it can later be extracted into a shared `unifi-core` library.
+   imports, keeping the shared-with-`unifi-mcp` contract in one authoritative
+   place.
 
 ## 2. Commands
 
@@ -106,7 +107,7 @@ src/unifictl/
     aggregation.py           # PURE transform + rules (op_mode, num_ports 2–8). No I/O.
     models.py                # Device / PortOverride value objects
   infrastructure/
-    client.py                # UnifiClient (httpx) — EXTRACTION-READY, no domain/app imports
+    client.py                # UnifiClient (httpx) — isolated, no domain/app imports
     config.py                # load_settings() → frozen Settings (env secrets + XDG TOML)
     backup.py                # timestamped port_overrides snapshot writer
 tests/                       # mirrors package structure
@@ -125,8 +126,10 @@ tests/                       # mirrors package structure
   render. No cyclopts, no httpx types leaking in.
 - **infrastructure/** — `UnifiClient` implements the two private-API calls
   (§6), API-key auth, TLS/CA handling. `config.py` loads settings. **Boundary
-  rule:** this package imports nothing from `domain/` or `application/`, so it
-  lifts cleanly into `unifi-core` later. Enforce with an import-linter contract.
+  rule:** this package imports nothing from `domain/` or `application/`. This is
+  hygiene, and it gives the shared *contract* with `unifi-mcp` (§4) one
+  authoritative home — not a path to a shared library, since `unifi-mcp` is
+  TypeScript and can't share Python code. Enforce with an import-linter contract.
 - **commands/** — parse args, run the confirm prompt (`questionary`/`rich`),
   print the diff and result, map exceptions to exit codes. **Zero business
   logic** — same discipline as jobhound's `set.py`.
@@ -169,9 +172,15 @@ sources, so secrets never surface in `--help`.
   commit an example:** switch MAC, leader ports, ports-per-LAG. Resolution
   order: explicit flag > env > TOML > built-in default.
 
-Auth: reuse `UNIFI_API_KEY` for the private endpoints (works on UniFi OS).
-Username/password session login is **deferred** — add only if an endpoint
-rejects the key.
+Auth: reuse `UNIFI_API_KEY` (`X-API-KEY` header) for the private endpoints.
+**Confirmed on a live UDM Pro** — the key authenticates both a `stat/device`
+read and a `rest/device` write (`PUT` → `200 {"rc":"ok"}`), with no login,
+cookie, or CSRF token. Username/password session login is **not built** — a
+documented fallback only, to add if some future endpoint rejects the key.
+
+**Site identifier (gotcha):** the private-API `<site>` path segment is the site
+*name* / internal reference (e.g. `default`), **not** the v1 Integration API
+`siteId` UUID. `UNIFI_SITE` default `default` is correct; never pass the UUID.
 
 ### LAG domain rule (bake into `domain/aggregation.py`)
 
@@ -242,8 +251,8 @@ cover edges and errors, not just the happy path.
 - Take a timestamped backup of the full array before any PUT.
 - Load secrets from env only; never print/log the API key; never register
   secrets as CLI params.
-- Keep `UnifiClient` free of `domain/` and `application/` imports
-  (extraction-ready); enforce with an import-linter contract.
+- Keep `UnifiClient` free of `domain/` and `application/` imports (client
+  isolation); enforce with an import-linter contract.
 - Keep `commands/` a thin adapter; business logic lives in `application/` +
   `domain/`.
 - Commit on a feature branch; run `ruff` + `ty` + relevant tests first.
@@ -252,8 +261,8 @@ cover edges and errors, not just the happy path.
 
 - Any write beyond the LAG toggle (new endpoints, new `port_overrides` fields).
 - Adding a dependency beyond the jobhound-mirrored stack.
-- Extracting the shared `unifi-core` library (defer until `unifi-mcp`'s
-  legacy-API work pins the shared surface).
+- Diverging from `unifi-mcp`'s documented private-API contract (endpoints, auth,
+  `{site}` quirk) rather than staying consistent with it.
 - Shipping any committed config that sets `UNIFI_INSECURE_TLS`.
 - Distribution mechanism (`uv tool` / `pipx` vs a Homebrew formula in `yo61/tap`).
 - Adopting session (username/password) auth.
@@ -271,12 +280,17 @@ cover edges and errors, not just the happy path.
 
 ## 8. ADRs to capture during build
 
-1. Use the private/legacy session API for `port_overrides` because the
+1. Use the private/legacy controller API for `port_overrides` because the
    Integration API does not expose per-port aggregation.
-2. Isolate the UniFi client behind `infrastructure/` so it can be extracted into
-   a shared `unifi-core` library once `unifi-mcp` adopts the legacy REST API.
-3. CLI grammar is verb-first (`set <resource> <value>`) for consistency with
+2. Authenticate the private API with the Integration API key (confirmed by a
+   live UDM Pro read + write); session login is an unbuilt fallback.
+3. No shared code library with `unifi-mcp` (it is TypeScript, unifictl is
+   Python); align to its documented private-API contract instead. Client stays
+   isolated in `infrastructure/` as hygiene.
+4. CLI grammar is verb-first (`set <resource> <value>`) for consistency with
    jobhound and kubectl/systemctl; independent of the DDD backend.
+
+ADRs 1–3 are settled now (see `decisions/`); the rest are captured during build.
 
 ## 9. Open items (not blocking the first build)
 

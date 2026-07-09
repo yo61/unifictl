@@ -57,9 +57,11 @@ not Terraform (see **Deferred**).
 - Endpoints (private API, UniFi OS proxied under `/proxy/network`):
   - `GET  /proxy/network/api/s/<site>/stat/device/<mac>` → device `_id` + `port_overrides`
   - `PUT  /proxy/network/api/s/<site>/rest/device/<id>`  → `{ "port_overrides": [ ... ] }`
-- **Auth:** on UniFi OS the Integration API key also authenticates these session
-  HTTP endpoints, so reuse `UNIFI_API_KEY` — no separate login needed. Fallback
-  if ever required: username/password session login (cookie + CSRF token).
+- **Auth:** on UniFi OS the Integration API key also authenticates these private
+  endpoints — **confirmed on a live UDM Pro** for both a `stat/device` read and
+  a `rest/device` write (`PUT` → `200 {"rc":"ok"}`). Reuse `UNIFI_API_KEY`; no
+  login, cookie, or CSRF token needed. Username/password session login stays a
+  documented fallback, unbuilt unless a future endpoint rejects the key.
 
 ## Config & secrets (reuse `unifi-mcp` conventions)
 
@@ -97,32 +99,29 @@ httpx, rich, xdg-base-dirs, tomli-w; ruff (line-length 100, double quotes,
 (`dev:lint|fmt|typecheck|test|check`), pre-commit, commitlint, release-please,
 mise, `decisions/`, `docs/`, `[project.scripts]` entrypoint.
 
-## Shared library with `unifi-mcp`
+## Shared contract with `unifi-mcp` (not a shared library)
 
-Once `unifi-mcp` also speaks the legacy REST API, the client code stops being
-unifictl-specific: connection + `UNIFI_*` settings, API-key/session auth,
-TLS/CA handling, timeouts, and the read-modify-write device primitives are
-identical on both sides. That overlap is exact enough to justify a **shared
-library** (working name `unifi-core`, TBD) that both tools depend on.
+`unifi-mcp` is **TypeScript**; `unifictl` is **Python**. They can't share a code
+library across runtimes, so the earlier "shared `unifi-core` package" idea is
+dropped. What they *do* share is the **contract**: the private controller API's
+endpoints, auth model, the `{site}` identifier quirk, and the `port_overrides`
+shape. `unifi-mcp`'s legacy-controller-API design doc
+(`docs/superpowers/specs/2026-07-05-legacy-controller-api-design.md`) is the
+reference for that contract; `unifictl` stays consistent with it, re-implemented
+in Python.
 
-- **In the library** — `UnifiClient` (httpx): settings, auth, TLS/CA, and the
-  low-level Integration + legacy REST calls; plus shared `Device` /
-  `PortOverride` models.
-- **Stays in `unifictl`** — the LAG domain rule (the pure `port_overrides`
-  transform), the `set_aggregation` use-case, and the cyclopts `lag` command.
-- **Stays in `unifi-mcp`** — the MCP server, tool definitions, read models.
+- **Shared as documented contract:** base URL + `UNIFI_*` env conventions,
+  API-key auth, TLS/CA handling, the `/proxy/network` base path, the `{site}` =
+  internal-reference quirk (`default`, not the v1 UUID), and the
+  read-modify-write device shape.
+- **`unifictl` owns:** imperative actions (the LAG toggle) — the write side.
+- **`unifi-mcp` owns:** reads across both the Integration (v1) and legacy
+  surfaces (read-only now; a write path is plumbed behind `UNIFI_ALLOW_WRITES`
+  but no legacy writes are authored).
 
-**Minimum commitment now: keep the client isolated so the shared library can be
-swapped in later.** The `infrastructure/` layer already draws that boundary —
-build unifictl's own `UnifiClient` there as a self-contained module (settings +
-auth + HTTP + shared models) with no domain/application code leaking in, behind
-an interface the rest of the app depends on. Then extracting it into
-`unifi-core` — or swapping in unifi-mcp's version — is a *move*, not a rewrite.
-
-Defer the actual extraction until `unifi-mcp`'s legacy-API work is concrete
-enough to pin the shared surface: a third package adds cross-repo version
-coordination and a release step the single-repo plan avoids, so it's only worth
-paying once the interface is stable on both sides.
+Keep unifictl's `UnifiClient` isolated in `infrastructure/` regardless — not for
+cross-language extraction, but as ordinary hygiene and to give the contract one
+authoritative home in the Python codebase.
 
 ## ADRs to capture
 
@@ -130,10 +129,13 @@ paying once the interface is stable on both sides.
    Integration API (used by `unifi-mcp`) does not expose per-port aggregation."
    Records why unifictl is deliberately *not* just another Integration API
    client.
-2. "Isolate the UniFi client behind the `infrastructure/` boundary so it can be
-   extracted into a shared `unifi-core` library once `unifi-mcp` adopts the
-   legacy REST API." Records the reads-vs-actions split and the deferred
-   extraction.
+2. "unifi-mcp is TypeScript and unifictl is Python, so there is no shared code
+   library; instead align unifictl's client with unifi-mcp's documented legacy
+   controller-API contract." Records the reads-vs-actions split and why the
+   `unifi-core` package idea was dropped.
+3. "Authenticate the private controller API with the Integration API key,
+   confirmed by a live read + write on a UDM Pro; session login is an unbuilt
+   fallback." Records the empirical basis for skipping the session-auth path.
 
 ## Deferred — Terraform for steady state
 
@@ -147,15 +149,19 @@ Not on the critical path now.
 
 ## Open decisions for build-out
 
+Resolved in `SPEC.md` / `decisions/`:
+
+- **Auth** → API key, confirmed live on a UDM Pro (read + write); session login
+  unbuilt fallback. See `decisions/2026-07-09-private-api-auth.md`.
+- **CLI shape** → verb-first `set lag on|off` (`set` sub-app), matching
+  jobhound; presentation-layer only, DDD backend unchanged.
+- **Shared library** → dropped; `unifi-mcp` is TypeScript, so align to its
+  contract instead. See `decisions/2026-07-09-no-shared-library.md`.
+
+Still open:
+
 - Command name/alias: `unifictl` vs a short alias in the `jh` spirit.
-- Auth: API key (recommended, matches unifi-mcp) vs session login — build API
-  key first, add session only if a needed endpoint rejects the key.
-- `lag set on|off` (sub-app) vs a flatter action verb, per jobhound's
-  action-based style.
 - Distribution: `uv tool` / `pipx` vs a Homebrew formula in `yo61/tap`.
-- Shared library timing: extract `unifi-core` up front, or ship unifictl's own
-  isolated `UnifiClient` first and extract once `unifi-mcp`'s legacy-REST work
-  pins the shared surface (recommended — keep the boundary, defer the package).
 
 ## Reference cyclopts sketch (starting point, not final)
 
