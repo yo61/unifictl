@@ -9,6 +9,7 @@ from cyclopts import App
 from unifictl import __version__
 from unifictl.commands.list_ import app as list_app
 from unifictl.commands.set import app as set_app
+from unifictl.commands.show import app as show_app
 
 app = App(
     name="unifictl",
@@ -17,6 +18,7 @@ app = App(
 )
 app.command(set_app)
 app.command(list_app)
+app.command(show_app)
 
 
 def main() -> None:
