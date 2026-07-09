@@ -149,7 +149,8 @@ tests/                       # mirrors package structure
 | tests | `pytest`, `pytest-cov`, `hypothesis` |
 | http tests | `pytest-httpx` (mock the two endpoints) |
 | repo tooling | Taskfile (`dev:lint\|fmt\|typecheck\|test\|check`), pre-commit, commitlint, release-please, mise, `decisions/`, `docs/` |
-| entry point | `[project.scripts] unifictl = "unifictl.cli:main"` (short alias TBD) |
+| entry point | `[project.scripts] unifictl = "unifictl.cli:main"` (single command, no alias) |
+| distribution | `uv tool` / `pipx` primary; Homebrew `unifictl.rb` in `yo61/tap` at first release |
 
 `requires-python = ">=3.11"` to match jobhound.
 
@@ -294,7 +295,8 @@ ADRs 1–3 are settled now (see `decisions/`); the rest are captured during buil
 
 ## 9. Open items (not blocking the first build)
 
-- Command alias in the `jh` spirit vs. spelling out `unifictl`.
-- Distribution: `uv tool` / `pipx` vs Homebrew tap.
 - Whether a future `lag`-noun sub-app (`lag status`) is worth adding alongside
   `set lag` once read operations exist.
+
+Settled: command name (`unifictl`, no alias) and distribution (`uv tool` / `pipx`
+plus a `yo61/tap` formula at first release).

@@ -158,10 +158,12 @@ Resolved in `SPEC.md` / `decisions/`:
 - **Shared library** → dropped; `unifi-mcp` is TypeScript, so align to its
   contract instead. See `decisions/2026-07-09-no-shared-library.md`.
 
-Still open:
+- **Command name** → `unifictl` only, no short alias (kubectl/systemctl -ctl
+  convention; users can add their own shell alias). YAGNI.
+- **Distribution** → `uv tool` / `pipx` as primary, plus a Homebrew `unifictl.rb`
+  in `yo61/tap` at first release, mirroring `jobhound.rb`.
 
-- Command name/alias: `unifictl` vs a short alias in the `jh` spirit.
-- Distribution: `uv tool` / `pipx` vs a Homebrew formula in `yo61/tap`.
+No open decisions remain; `SPEC.md` is the build reference.
 
 ## Reference cyclopts sketch (starting point, not final)
 
