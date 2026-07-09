@@ -7,6 +7,7 @@ import sys
 from cyclopts import App
 
 from unifictl import __version__
+from unifictl.commands.list_ import app as list_app
 from unifictl.commands.set import app as set_app
 
 app = App(
@@ -15,6 +16,7 @@ app = App(
     version=__version__,
 )
 app.command(set_app)
+app.command(list_app)
 
 
 def main() -> None:
