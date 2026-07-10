@@ -26,6 +26,29 @@ unifictl set lag off --dry-run  # print the computed change, apply nothing
 A real apply prints the diff, prompts for confirmation, and snapshots the
 switch's current `port_overrides` to a timestamped backup before writing.
 
+## Shell completion
+
+`unifictl` ships bash, zsh, and fish completion. The Homebrew formula installs
+it automatically. For `uv tool`/`pipx` installs, run:
+
+```sh
+unifictl completion install          # detects your shell from $SHELL
+unifictl completion install --shell zsh
+```
+
+Or print a script to wire up manually. For zsh, write it as `_unifictl` into a
+directory on your `$fpath` — the default is `~/.zfunc`:
+
+```sh
+unifictl completion zsh > ~/.zfunc/_unifictl
+# then in ~/.zshrc:  fpath+=~/.zfunc && autoload -U compinit && compinit
+```
+
+Completion covers the command tree, `set lag on|off`, and — when your
+controller is reachable — switch MACs (`--switch`) and port indices
+(`show port`, `set lag --leader`). A slow or unreachable controller yields no
+candidates rather than blocking your shell.
+
 ## Configuration
 
 Connection and secrets come from the environment (never committed), matching
