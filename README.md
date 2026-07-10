@@ -36,10 +36,12 @@ unifictl completion install          # detects your shell from $SHELL
 unifictl completion install --shell zsh
 ```
 
-Or print a script to wire up manually:
+Or print a script to wire up manually. For zsh, write it as `_unifictl` into a
+directory on your `$fpath` — the default is `~/.zfunc`:
 
 ```sh
-unifictl completion zsh > "${ZDOTDIR:-$HOME/.zfunc}/completions/_unifictl"
+unifictl completion zsh > ~/.zfunc/_unifictl
+# then in ~/.zshrc:  fpath+=~/.zfunc && autoload -U compinit && compinit
 ```
 
 Completion covers the command tree, `set lag on|off`, and — when your
