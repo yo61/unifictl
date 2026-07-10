@@ -37,3 +37,29 @@ def test_main_maps_config_error_to_exit_1(monkeypatch: pytest.MonkeyPatch) -> No
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 1
+
+
+def test_completion_zsh_registered(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        app(["completion", "zsh"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.startswith("#compdef unifictl")
+
+
+def test_main_complete_fast_path(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["unifictl", "__complete", "zsh", "unifictl", ""])
+    main()
+    assert set(capsys.readouterr().out.split()) == {"set", "list", "show", "completion"}
+
+
+def test_main_refreshes_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[bool] = []
+    from unifictl.commands import completion
+
+    monkeypatch.setattr(completion, "maybe_refresh_installed_stubs", lambda: called.append(True))
+    monkeypatch.setattr(sys, "argv", ["unifictl", "--help"])
+    with pytest.raises(SystemExit):
+        main()
+    assert called == [True]
