@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0](https://github.com/yo61/unifictl/compare/v0.1.0...v0.2.0) (2026-07-10)
+
+
+### Features
+
+* add list devices and show port read commands ([bde5591](https://github.com/yo61/unifictl/commit/bde55916bd40909ca9cf6896eb07d14c26b8e072))
+* **app:** device read use-cases and PortNotFoundError ([4c54eeb](https://github.com/yo61/unifictl/commit/4c54eebcf7eb3d75cd91fbfb4af5e4fc3794af35))
+* **cli:** list devices command ([9736330](https://github.com/yo61/unifictl/commit/9736330411b439e9471b429083bfca4ddc3e0281))
+* **cli:** show port command ([735bc45](https://github.com/yo61/unifictl/commit/735bc457ecda1ee71dd923870526a5b591dd91a6))
+* **domain:** describe_port and read value objects ([509b44f](https://github.com/yo61/unifictl/commit/509b44ff886127f1a9e3808fb75f731186b33f5c))
+* **domain:** device_summary extraction ([21ffa16](https://github.com/yo61/unifictl/commit/21ffa16b4264d53dcf32577d96f97859c268e2fc))
+* **infra:** add get_devices to the client ([b83f931](https://github.com/yo61/unifictl/commit/b83f9310a9fa3b27399ac39055c14afb83fc478b))
+
+
+### Documentation
+
+* design for list devices and show port read commands ([686a784](https://github.com/yo61/unifictl/commit/686a784f22876206b705843c7e1ffb362ff63955))
+* generalise LAG command help and examples ([8e09387](https://github.com/yo61/unifictl/commit/8e09387ad8271e7ff5e67c5e9c0e8d50d46cb93c))
+* generalise LAG command help and examples ([e935088](https://github.com/yo61/unifictl/commit/e9350889112c65988fda768cb15aa953b4a179ab))
+* implementation plan for list devices and show port ([f12ec16](https://github.com/yo61/unifictl/commit/f12ec169a4d8aabb68f046cfcc037be2375bc26c))
+
 ## 0.1.0 (2026-07-09)
 
 
