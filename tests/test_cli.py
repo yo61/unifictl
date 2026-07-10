@@ -63,3 +63,15 @@ def test_main_refreshes_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit):
         main()
     assert called == [True]
+
+
+def test_importing_cli_does_not_pull_questionary() -> None:
+    import subprocess
+    import sys
+
+    # A fresh interpreter: importing the CLI module must not transitively
+    # import questionary (it lives behind the lazy get_app()), so the
+    # __complete fast-path stays cheap.
+    code = "import unifictl.cli, sys; assert 'questionary' not in sys.modules"
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
