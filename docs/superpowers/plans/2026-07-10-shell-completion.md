@@ -1000,6 +1000,20 @@ def test_main_refreshes_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 Run: `uv run pytest tests/test_cli.py -q`
 Expected: FAIL — `completion` command unknown / fast-path prints nothing.
 
+> **Plan amendment (applied during execution):** registering the completion
+> sub-App beside the existing eager module-level command imports (Steps 3–4 as
+> originally written) defeats the fast-path — `import unifictl.cli` (which the
+> `unifictl.cli:main` entry point always runs) would pull in `set.py` →
+> `questionary` before `main()`'s `__complete` branch fires, so TAB completion
+> pays the heavy-import cost the fast-path exists to avoid. Fix: restructure
+> cli.py to build the App lazily (mirroring jobhound) — move ALL command-module
+> imports and `App` construction into a `get_app()` function, register
+> `completion_app` there too, and expose `app` as a thin shim
+> (`def app(*a, **k): return get_app()(*a, **k)`) so `from unifictl.cli import
+> app; app([...])` still works. A regression test asserts a fresh
+> `import unifictl.cli` leaves `questionary` out of `sys.modules`. Steps 3–4
+> below are superseded by this lazy structure.
+
 - [ ] **Step 3: Register the completion sub-App**
 
 In `src/unifictl/cli.py`, add the import beside the other command imports and register it:
@@ -1167,6 +1181,8 @@ git commit -m "docs: document shell completion"
 ### Task 8: Deploy completion via the Homebrew formula (repo: `yo61/homebrew-tap`)
 
 > **Sequencing:** Do this **after** a `unifictl` release containing the `completion` command is published to PyPI and the tap's auto-bump PR has landed that version. `generate_completions_from_executable` runs the installed binary at build time, so the formula must point at a version that *has* the command. This is a separate git repo — branch and PR there, not in `unifictl`.
+>
+> **Cross-repo dependency (see `decisions/2026-07-10-homebrew-bump-cooldown-gotcha.md`):** the tap's `bump-unifictl.yaml` dispatches `brew update-python-resources` seconds after a release, but Homebrew's hardcoded 24h release cooldown (`RELEASE_COOLDOWN_DAYS = 1`) makes that resolve step **fail** for any PyPI upload younger than a day. `bump-unifictl.yaml` still has this latent bug (jobhound already hit it on 0.17.0 and got the fix). So the completion release will not auto-deploy to Homebrew until `bump-unifictl.yaml` gets the jobhound-style self-heal (schedule trigger + cooldown gate + `skip_cooldown` emergency input, mirroring `bump-jobhound.yaml`). Fold that workflow fix into the same tap PR as this formula edit (or land it first), otherwise the bump that would carry these completions goes red. This is orthogonal to the formula's `install`/`test` blocks — it is a workflow fix, not a formula edit.
 
 **Files:**
 - Modify: `~/code/github.com/yo61/homebrew-tap/Formula/unifictl.rb` (`def install` and `test do` blocks only).
