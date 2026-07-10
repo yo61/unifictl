@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from unifictl.infrastructure.client import UnifiClient
+from unifictl.infrastructure.config import ConfigError, load_settings
+
 # Top-level visible commands (the hidden __complete is intentionally absent).
 _TOP_LEVEL_COMMANDS: frozenset[str] = frozenset({"set", "list", "show", "completion"})
 
@@ -40,6 +43,91 @@ _LOCAL_PATH_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
 # Sole candidate signalling the shell to run native path completion.
 FILES_SENTINEL = "__UNIFICTL_COMPLETE_FILES__"
 
+# Hard ceiling on the completion network call so an unreachable controller
+# fails fast instead of freezing the shell on TAB.
+COMPLETION_TIMEOUT_MS = 2000
+
+# Flags whose value is a switch MAC.
+_SWITCH_MAC_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
+    {
+        (("set", "lag"), "--switch"),
+        (("show", "port"), "--switch"),
+    }
+)
+
+# cmd_path -> positional index that is a port index.
+_PORT_IDX_AT_POSITION: dict[tuple[str, ...], int] = {
+    ("show", "port"): 0,
+}
+
+# Flags whose value is a port index.
+_PORT_IDX_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
+    {
+        (("set", "lag"), "--leader"),
+    }
+)
+
+
+def _completion_devices() -> list[dict[str, object]]:
+    """Fetch raw devices for completion, or ``[]`` on any problem.
+
+    Bounded by ``COMPLETION_TIMEOUT_MS`` and swallows every error so a TAB
+    press never hangs or fails: missing config, an unreachable controller, or
+    a malformed response all degrade to no candidates.
+    """
+    from dataclasses import replace
+
+    try:
+        settings = load_settings()
+    except ConfigError:
+        return []
+    settings = replace(settings, timeout_ms=min(settings.timeout_ms, COMPLETION_TIMEOUT_MS))
+    client = None
+    try:
+        client = UnifiClient(settings)
+        return client.get_devices()
+    except Exception:  # completion must never surface errors: swallow and return []
+        return []
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _switch_macs() -> list[str]:
+    """MACs of adopted switches (``type == 'usw'``)."""
+    macs: list[str] = []
+    for device in _completion_devices():
+        if device.get("type") == "usw":
+            mac = device.get("mac")
+            if isinstance(mac, str) and mac:
+                macs.append(mac)
+    return macs
+
+
+def _resolve_switch(tokens: list[str]) -> str | None:
+    """The ``--switch`` value already typed in ``tokens``, else the config default."""
+    for index, token in enumerate(tokens):
+        if token == "--switch" and index + 1 < len(tokens):
+            return tokens[index + 1]
+    try:
+        return load_settings().switch
+    except ConfigError:
+        return None
+
+
+def _port_indices(switch_mac: str) -> list[str]:
+    """The ``port_idx`` values (as strings) from ``switch_mac``'s ``port_table``."""
+    for device in _completion_devices():
+        if device.get("mac") == switch_mac:
+            table = device.get("port_table", [])
+            indices: list[str] = []
+            if isinstance(table, list):
+                for entry in table:
+                    if isinstance(entry, dict) and "port_idx" in entry:
+                        indices.append(str(entry.get("port_idx")))
+            return indices
+    return []
+
 
 def _walk_static(words: list[str]) -> tuple[tuple[str, ...], list[str]]:
     """Walk the static command tree following ``words``.
@@ -64,6 +152,31 @@ def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
     if len(cmd_path) == 1:
         return _SUB_APP_NAMES.get(cmd_path[0], frozenset())
     return frozenset()
+
+
+# Flags that consume the following token as their value, so that token is not
+# a positional. Used to locate positional slots when flags are interleaved.
+_VALUE_FLAGS: frozenset[str] = frozenset({"--switch", "--leader", "--shell", "--dest", "-d"})
+
+
+def _positional_index(tokens: list[str]) -> int:
+    """Return the index of the next positional slot in ``tokens``.
+
+    Flags and the values consumed by value-taking flags are skipped, so the
+    result counts only true positional arguments already supplied.
+    """
+    count = 0
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            if token in _VALUE_FLAGS:
+                skip_next = True
+            continue
+        count += 1
+    return count
 
 
 def run(shell: str, /, *words: str) -> None:
@@ -95,10 +208,28 @@ def run(shell: str, /, *words: str) -> None:
                 for value in fixed:
                     print(value)
                 return
+            if (cmd_path, prev) in _SWITCH_MAC_FLAGS:
+                for mac in _switch_macs():
+                    print(mac)
+                return
+            if (cmd_path, prev) in _PORT_IDX_FLAGS:
+                switch_mac = _resolve_switch(in_positionals[:-1])
+                if switch_mac:
+                    for port in _port_indices(switch_mac):
+                        print(port)
+                return
 
-    if len(in_positionals) == 0 and cmd_path in _POSITIONAL_FIXED_VALUES:
+    if _positional_index(in_positionals) == 0 and cmd_path in _POSITIONAL_FIXED_VALUES:
         for value in _POSITIONAL_FIXED_VALUES[cmd_path]:
             print(value)
+        return
+
+    port_position = _PORT_IDX_AT_POSITION.get(cmd_path)
+    if port_position is not None and _positional_index(in_positionals) == port_position:
+        switch_mac = _resolve_switch(in_positionals)
+        if switch_mac:
+            for port in _port_indices(switch_mac):
+                print(port)
         return
 
     if not leftover:

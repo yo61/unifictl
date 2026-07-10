@@ -636,6 +636,19 @@ Then, after the `_POSITIONAL_FIXED_VALUES` block and before the final `_visible_
         return
 ```
 
+> **Plan amendment (applied during execution):** `len(in_positionals)` counts
+> interleaved flags and the values they consume, so `show port --switch <mac>
+> <TAB>` (zero positionals typed) failed to match `== 0`. Fix: add a module-level
+> `_VALUE_FLAGS = frozenset({"--switch", "--leader", "--shell", "--dest", "-d"})`
+> and a `_positional_index(tokens)` helper that counts positionals while skipping
+> flags and their consumed values, then replace `len(in_positionals)` with
+> `_positional_index(in_positionals)` in **both** positional branches (the
+> `_POSITIONAL_FIXED_VALUES` check above and this port-index check). Two
+> regression tests were added: `set lag --switch aa:bb <TAB>` → `on off`, and a
+> direct `_positional_index` unit test. Also: the brief's `# noqa: BLE001` is
+> dropped (ruff `select` excludes `BLE`, so it is a dead/unused noqa flagged by
+> RUF100) and `entry["port_idx"]` becomes `entry.get("port_idx")` for `ty`.
+
 - [ ] **Step 6: Run tests to verify they pass**
 
 Run: `uv run pytest tests/test_complete.py -q`
