@@ -110,6 +110,9 @@ def install(
     target = target_dir / filename
     new_content = _read(detected)
 
+    # Unlike maybe_refresh_installed_stubs (a silent background hook), install is
+    # user-invoked and foreground: let a read error (e.g. permissions) surface as
+    # actionable feedback rather than swallowing it here.
     if target.exists() and target.read_text(encoding="utf-8") == new_content:
         print(f"unifictl completion: {target} is already up to date.")
         return
