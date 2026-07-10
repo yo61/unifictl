@@ -7,7 +7,9 @@ import sys
 from cyclopts import App
 
 from unifictl import __version__
+from unifictl.commands.list_ import app as list_app
 from unifictl.commands.set import app as set_app
+from unifictl.commands.show import app as show_app
 
 app = App(
     name="unifictl",
@@ -15,6 +17,8 @@ app = App(
     version=__version__,
 )
 app.command(set_app)
+app.command(list_app)
+app.command(show_app)
 
 
 def main() -> None:
@@ -25,11 +29,12 @@ def main() -> None:
     failures (:class:`UnifiClientError`) are converted to a single stderr line
     rather than a traceback.
     """
+    from unifictl.application.device_service import PortNotFoundError
     from unifictl.infrastructure.client import UnifiClientError
     from unifictl.infrastructure.config import ConfigError
 
     try:
         app()
-    except (ConfigError, UnifiClientError) as exc:
+    except (ConfigError, UnifiClientError, PortNotFoundError) as exc:
         print(f"unifictl: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc

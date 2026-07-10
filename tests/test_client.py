@@ -66,3 +66,15 @@ def test_http_error_is_wrapped_as_client_error(httpx_mock: HTTPXMock) -> None:
     client = UnifiClient(_settings())
     with pytest.raises(UnifiClientError):
         client.get_device(MAC)
+
+
+def test_get_devices_returns_all_and_sends_api_key(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="https://gw/proxy/network/api/s/default/stat/device",
+        json={"meta": {"rc": "ok"}, "data": [{"_id": "a", "mac": "aa"}, {"_id": "b", "mac": "bb"}]},
+    )
+    client = UnifiClient(_settings())
+    devices = client.get_devices()
+    assert [d["mac"] for d in devices] == ["aa", "bb"]
+    assert httpx_mock.get_requests()[0].headers["X-API-KEY"] == "secret"

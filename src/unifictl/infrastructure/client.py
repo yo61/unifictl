@@ -50,6 +50,13 @@ class UnifiClient:
         device: dict[str, Any] = devices[0]
         return device
 
+    def get_devices(self) -> list[dict[str, Any]]:
+        """Return the raw device objects for every adopted device."""
+        path = f"/proxy/network/api/s/{self._settings.site}/stat/device"
+        response = self._send("GET", path)
+        devices: list[dict[str, Any]] = response.json().get("data", [])
+        return devices
+
     def put_port_overrides(self, device_id: str, port_overrides: list[dict[str, Any]]) -> None:
         """PUT the full ``port_overrides`` array back to the device.
 
