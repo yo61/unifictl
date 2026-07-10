@@ -148,3 +148,22 @@ def test_positional_index_skips_flags_and_their_values() -> None:
     assert _complete._positional_index(["--json"]) == 0
     assert _complete._positional_index(["5"]) == 1
     assert _complete._positional_index(["--switch", "aa:bb", "5"]) == 1
+
+
+def test_completion_devices_swallows_non_config_error(monkeypatch) -> None:
+    # A malformed config.toml surfaces as TOMLDecodeError (a ValueError), not
+    # ConfigError. It must still degrade to no candidates, never raise.
+    def _raise() -> object:
+        raise ValueError("malformed TOML")
+
+    monkeypatch.setattr(_complete, "load_settings", _raise)
+    assert _complete._completion_devices() == []
+
+
+def test_port_completion_survives_malformed_config(run, monkeypatch) -> None:
+    def _raise() -> object:
+        raise ValueError("malformed TOML")
+
+    monkeypatch.setattr(_complete, "load_settings", _raise)
+    # Goes through _resolve_switch -> load_settings; must not raise.
+    assert run("unifictl", "show", "port", "") == []

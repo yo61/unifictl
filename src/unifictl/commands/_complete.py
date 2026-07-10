@@ -6,10 +6,11 @@ candidate per line; the shell scripts handle quoting and prefix filtering.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterable
 
 from unifictl.infrastructure.client import UnifiClient
-from unifictl.infrastructure.config import ConfigError, load_settings
+from unifictl.infrastructure.config import load_settings
 
 # Top-level visible commands (the hidden __complete is intentionally absent).
 _TOP_LEVEL_COMMANDS: frozenset[str] = frozenset({"set", "list", "show", "completion"})
@@ -79,7 +80,7 @@ def _completion_devices() -> list[dict[str, object]]:
 
     try:
         settings = load_settings()
-    except ConfigError:
+    except Exception:
         return []
     settings = replace(settings, timeout_ms=min(settings.timeout_ms, COMPLETION_TIMEOUT_MS))
     client = None
@@ -90,7 +91,8 @@ def _completion_devices() -> list[dict[str, object]]:
         return []
     finally:
         if client is not None:
-            client.close()
+            with contextlib.suppress(Exception):
+                client.close()
 
 
 def _switch_macs() -> list[str]:
@@ -111,7 +113,7 @@ def _resolve_switch(tokens: list[str]) -> str | None:
             return tokens[index + 1]
     try:
         return load_settings().switch
-    except ConfigError:
+    except Exception:
         return None
 
 
@@ -156,6 +158,8 @@ def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
 
 # Flags that consume the following token as their value, so that token is not
 # a positional. Used to locate positional slots when flags are interleaved.
+# Invariant: no flag name is value-taking in one command and boolean in
+# another, so a flat set (not keyed by command) suffices to skip flag values.
 _VALUE_FLAGS: frozenset[str] = frozenset({"--switch", "--leader", "--shell", "--dest", "-d"})
 
 
