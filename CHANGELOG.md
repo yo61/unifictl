@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/yo61/unifictl/compare/v0.3.0...v0.3.1) (2026-07-11)
+
+
+### Documentation
+
+* note Homebrew 24h bump-cooldown gotcha and remedy ([#7](https://github.com/yo61/unifictl/issues/7)) ([63bd40a](https://github.com/yo61/unifictl/commit/63bd40a436103c4437abda04f9132782ceec8a7d))
+
 ## [0.3.0](https://github.com/yo61/unifictl/compare/v0.2.0...v0.3.0) (2026-07-10)
 
 
