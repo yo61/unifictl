@@ -1,6 +1,6 @@
 [project]
 name = "unifictl"
-version = "0.3.0"
+version = "0.3.1"
 description = "Imperative UniFi homelab actions the Integration API can't express"
 readme = "README.md"
 license = "Apache-2.0"
