@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.3.0](https://github.com/yo61/unifictl/compare/v0.2.0...v0.3.0) (2026-07-10)
+
+
+### Features
+
+* add completion command with install and self-heal ([9c95caa](https://github.com/yo61/unifictl/commit/9c95caa2d11b24829fbf15c236dac424d3c78170))
+* add static __complete candidate handler ([20ba56b](https://github.com/yo61/unifictl/commit/20ba56b755071946e17fe2fc7bd768a89fe19dac))
+* bundle per-shell completion scripts ([2594031](https://github.com/yo61/unifictl/commit/259403171e50d392052710589739640bf4809ab1))
+* complete switch MACs and port indices from the controller ([3aae21a](https://github.com/yo61/unifictl/commit/3aae21a70163a1fbd979114d5357d10b524ee371))
+* shell completion for bash, zsh, and fish ([59c6787](https://github.com/yo61/unifictl/commit/59c6787bf5043b3d6bab9d3d9bc7882e33ddb7c0))
+* wire completion command and __complete fast-path into cli ([5f0af44](https://github.com/yo61/unifictl/commit/5f0af44f2436f2a98157a2f09873e66d3ebbedcf))
+
+
+### Bug Fixes
+
+* swallow all config errors in completion to never break the shell ([9a7b397](https://github.com/yo61/unifictl/commit/9a7b397256fb49e0b1c1fe0be6df533da415148d))
+
+
+### Documentation
+
+* design for shell completion ([bcd4b89](https://github.com/yo61/unifictl/commit/bcd4b8986c83664033feb13789e685a35b4d5026))
+* document shell completion ([7ff9c8c](https://github.com/yo61/unifictl/commit/7ff9c8cc4af5d8f16011ea1f253af28d1acfceb6))
+* fix zsh manual-wire completion path to match install default ([d87defa](https://github.com/yo61/unifictl/commit/d87defa52836047308a7cdf7a4d2cb09af933b6a))
+* implementation plan for shell completion ([8b93b49](https://github.com/yo61/unifictl/commit/8b93b49be7ffdf7efb2860fa28525eeb295b2a04))
+* note deliberate unguarded read in completion install ([6d30128](https://github.com/yo61/unifictl/commit/6d30128c2071536fa39abb16faacdabaea3ce837))
+* record shell-completion plan amendments from execution ([647561d](https://github.com/yo61/unifictl/commit/647561db243ffe0eac00fb9794cd6dc12770c97f))
+
 ## [0.2.0](https://github.com/yo61/unifictl/compare/v0.1.0...v0.2.0) (2026-07-10)
 
 
