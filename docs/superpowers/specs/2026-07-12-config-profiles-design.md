@@ -171,14 +171,17 @@ CLI flag  >  UNIFI_* env var  >  selected profile  >  top-level TOML default  > 
 ## Architecture / placement
 
 - All logic lives in `src/unifictl/infrastructure/config.py`. New surface:
-  - `load_settings(profile: str | None = None) -> Settings` — resolves the ladder.
-  - profile-name resolution helper (`--profile`/`UNIFI_PROFILE`/`default_profile`).
+  - `load_settings() -> Settings` — resolves the ladder, reading the selected
+    profile name internally from `UNIFI_PROFILE`/`default_profile`. Signature is
+    unchanged, so the five existing commands are untouched.
+  - `read_config()` / `load_profiles(data)` — parse + validate profile tables.
+  - profile-selection helper (`UNIFI_PROFILE`/`default_profile`).
   - a permission-check helper for the secret-present case.
-  - accessors used by `profile list`/`show` (profile names, a redacted view).
+- The global `--profile` flag is a cyclopts `app.meta` launcher in `cli.py` that
+  sets `os.environ["UNIFI_PROFILE"]` before dispatch (so flag beats env), keeping
+  the flag genuinely global without threading it through sub-apps.
 - New command module `src/unifictl/commands/profile.py` mounts a `profile`
-  sub-app (`list`, `show`), registered in `cli.py` alongside the others.
-- The five existing commands change only to pass the resolved profile name into
-  `load_settings(...)`.
+  sub-app (`list`, `show`, `example`), registered in `cli.py` alongside the others.
 - `Settings` (frozen dataclass) is unchanged — profiles resolve *into* it.
 
 ## Testing
@@ -208,7 +211,13 @@ Resolution is pure logic over one TOML read + env, so it's unit-testable with
 Tests mirror package structure in `tests/` (extend `test_config.py`; add
 `tests/test_cmd_profile.py`).
 
-## Open implementation questions (resolve in the plan, not blocking)
+## Resolved implementation questions
 
-- Exact cyclopts mechanism for the global `--profile` flag through sub-apps.
-- `api_key` redaction format in `profile show` (last-4 vs. fixed mask).
+See the plan `docs/superpowers/plans/2026-07-13-config-profiles.md`:
+
+- Global `--profile` flag: a cyclopts `app.meta` launcher that sets `UNIFI_PROFILE`
+  (verified against cyclopts 4.11.2; preserves help/version and error propagation).
+- `api_key` redaction in `profile show`: last 4 characters (`…cret`), or `****`
+  when the value is 4 chars or shorter.
+- Completion: new commands are added to the hardcoded `_complete.py` static tables;
+  profile-name *value* completion is deferred (out of scope for v1).
