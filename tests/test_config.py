@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os as _os
+
 import pytest
 
 from unifictl.infrastructure.config import ConfigError, load_profiles, load_settings, read_config
@@ -95,7 +97,9 @@ def test_read_config_absent_returns_empty(monkeypatch, tmp_path) -> None:
 def _write_config(tmp_path, body: str) -> None:
     cfg = tmp_path / "unifictl"
     cfg.mkdir(exist_ok=True)
-    (cfg / "config.toml").write_text(body, encoding="utf-8")
+    config_path = cfg / "config.toml"
+    config_path.write_text(body, encoding="utf-8")
+    _os.chmod(config_path, 0o600)  # tests opt into a laxer mode explicitly when needed
 
 
 def test_profile_supplies_connection(monkeypatch, tmp_path) -> None:
@@ -162,3 +166,27 @@ def test_profile_switch_type_error_names_profile(monkeypatch, tmp_path) -> None:
     _write_config(tmp_path, "[profiles.home]\nswitch = 42\n")
     with pytest.raises(ConfigError, match=r"home.*switch.*string"):
         load_settings()
+
+
+def test_world_readable_secret_refused(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
+    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o644)
+    with pytest.raises(ConfigError, match="chmod 600"):
+        load_settings()
+
+
+def test_world_readable_without_secret_is_allowed(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)  # secrets come from env, not the file
+    _write_config(tmp_path, 'switch = "aa:bb"\n[profiles.home]\nbase_url = "https://home"\n')
+    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o644)
+    assert load_settings().switch == "aa:bb"  # no refusal
+
+
+def test_secret_with_0600_is_allowed(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
+    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o600)
+    assert load_settings().api_key == "secret"  # env still wins; no refusal

@@ -252,8 +252,24 @@ def _resolve_int(
 
 
 def _enforce_secret_permissions(path: Path, profiles: dict[str, dict[str, object]]) -> None:
-    """Placeholder; real check added in the permissions task."""
-    return
+    """Refuse a group/world-readable config file that holds an inline secret.
+
+    Args:
+        path: The config file path.
+        profiles: The parsed profile tables.
+
+    Raises:
+        ConfigError: if the file is group/world-readable and any profile carries
+            an inline ``api_key``.
+    """
+    if not path.exists():
+        return
+    if not any("api_key" in table for table in profiles.values()):
+        return
+    if path.stat().st_mode & 0o077:
+        raise ConfigError(
+            f"{path} is group/world-readable but holds an inline api_key; run: chmod 600 {path}"
+        )
 
 
 def _optional_path(raw: str | None) -> Path | None:
