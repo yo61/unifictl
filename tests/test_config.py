@@ -90,3 +90,75 @@ def test_load_profiles_rejects_non_table_profile() -> None:
 def test_read_config_absent_returns_empty(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert read_config() == {}
+
+
+def _write_config(tmp_path, body: str) -> None:
+    cfg = tmp_path / "unifictl"
+    cfg.mkdir(exist_ok=True)
+    (cfg / "config.toml").write_text(body, encoding="utf-8")
+
+
+def test_profile_supplies_connection(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    for var in ("UNIFI_BASE_URL", "UNIFI_API_KEY", "UNIFI_SITE"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(
+        tmp_path,
+        "[profiles.home]\n"
+        'base_url = "https://home"\napi_key = "hk"\nsite = "s1"\nswitch = "aa:bb"\n',
+    )
+    settings = load_settings()
+    assert (settings.base_url, settings.api_key, settings.site, settings.switch) == (
+        "https://home",
+        "hk",
+        "s1",
+        "aa:bb",
+    )
+
+
+def test_env_overrides_profile(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)  # sets UNIFI_BASE_URL=https://gw, UNIFI_API_KEY=secret
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
+    settings = load_settings()
+    assert settings.base_url == "https://gw"  # env wins over profile
+    assert settings.api_key == "secret"
+
+
+def test_default_profile_used_when_unifi_profile_absent(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    for var in ("UNIFI_BASE_URL", "UNIFI_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
+    _write_config(
+        tmp_path,
+        'default_profile = "home"\n[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n',
+    )
+    assert load_settings().base_url == "https://home"
+
+
+def test_unknown_profile_raises(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("UNIFI_PROFILE", "ghost")
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
+    with pytest.raises(ConfigError, match=r"unknown profile 'ghost'.*home"):
+        load_settings()
+
+
+def test_missing_secret_names_profile(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
+    monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\n')
+    with pytest.raises(ConfigError, match=r"UNIFI_API_KEY.*home.*api_key"):
+        load_settings()
+
+
+def test_profile_switch_type_error_names_profile(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _write_config(tmp_path, "[profiles.home]\nswitch = 42\n")
+    with pytest.raises(ConfigError, match=r"home.*switch.*string"):
+        load_settings()
