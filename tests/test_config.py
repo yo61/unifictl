@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from unifictl.infrastructure.config import ConfigError, load_settings
+from unifictl.infrastructure.config import ConfigError, load_profiles, load_settings, read_config
 
 
 def _base_env(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
@@ -65,3 +65,28 @@ def test_env_timeout_invalid_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: o
     monkeypatch.setenv("UNIFI_TIMEOUT_MS", "soon")
     with pytest.raises(ConfigError, match="UNIFI_TIMEOUT_MS"):
         load_settings()
+
+
+def test_load_profiles_empty_when_absent() -> None:
+    assert load_profiles({}) == {}
+
+
+def test_load_profiles_returns_named_tables() -> None:
+    data = {"profiles": {"home": {"base_url": "https://gw", "switch": "aa:bb"}}}
+    assert load_profiles(data) == {"home": {"base_url": "https://gw", "switch": "aa:bb"}}
+
+
+def test_load_profiles_rejects_unknown_key() -> None:
+    data = {"profiles": {"home": {"leaders": [1, 3]}}}
+    with pytest.raises(ConfigError, match=r"home.*leaders"):
+        load_profiles(data)
+
+
+def test_load_profiles_rejects_non_table_profile() -> None:
+    with pytest.raises(ConfigError, match=r"home.*table"):
+        load_profiles({"profiles": {"home": "nope"}})
+
+
+def test_read_config_absent_returns_empty(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert read_config() == {}

@@ -78,6 +78,46 @@ def _load_toml(path: Path) -> dict[str, object]:
         return tomllib.load(fh)
 
 
+_PROFILE_KEYS = frozenset(
+    {"base_url", "api_key", "site", "ca_cert", "insecure_tls", "timeout_ms", "switch"}
+)
+
+
+def read_config() -> dict[str, object]:
+    """Return the parsed ``config.toml`` mapping (empty when the file is absent)."""
+    return _load_toml(config_file_path())
+
+
+def load_profiles(data: dict[str, object]) -> dict[str, dict[str, object]]:
+    """Extract and structurally validate the ``[profiles.*]`` tables.
+
+    Args:
+        data: The parsed ``config.toml`` mapping.
+
+    Returns:
+        A mapping of profile name to its key/value table.
+
+    Raises:
+        ConfigError: if ``profiles`` is not a table, a profile is not a table, or
+            a profile contains a key outside :data:`_PROFILE_KEYS`.
+    """
+    raw = data.get("profiles")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"config.toml: profiles must be a table, got {raw!r}")
+    profiles: dict[str, dict[str, object]] = {}
+    for name, table in raw.items():
+        if not isinstance(table, dict):
+            raise ConfigError(f"config.toml: profile {name!r} must be a table, got {table!r}")
+        unknown = set(table) - _PROFILE_KEYS
+        if unknown:
+            keys = ", ".join(sorted(unknown))
+            raise ConfigError(f"config.toml: profile {name!r} has unknown key(s): {keys}")
+        profiles[str(name)] = {str(key): value for key, value in table.items()}
+    return profiles
+
+
 def _optional_path(raw: str | None) -> Path | None:
     return Path(raw).expanduser() if raw else None
 
