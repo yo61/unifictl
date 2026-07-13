@@ -213,3 +213,55 @@ def test_global_profile_flag_name(run) -> None:
 def test_command_without_flags_yields_no_flag_names(run) -> None:
     # `set` is a group with no flags of its own.
     assert run("unifictl", "set", "-") == []
+
+
+@pytest.fixture()
+def fake_profiles(monkeypatch: pytest.MonkeyPatch):
+    def _install(names: list[str]) -> None:
+        monkeypatch.setattr(_complete, "_profile_names", lambda: list(names))
+
+    return _install
+
+
+@pytest.fixture()
+def fake_credentials(monkeypatch: pytest.MonkeyPatch):
+    def _install(names: list[str]) -> None:
+        monkeypatch.setattr(_complete, "_credential_names", lambda: list(names))
+
+    return _install
+
+
+def test_profile_delete_completes_profile_names(run, fake_profiles) -> None:
+    fake_profiles(["home", "work"])
+    assert run("unifictl", "profile", "delete", "") == ["home", "work"]
+
+
+def test_profile_describe_completes_profile_names(run, fake_profiles) -> None:
+    fake_profiles(["home", "work"])
+    assert run("unifictl", "profile", "describe", "") == ["home", "work"]
+
+
+def test_credential_delete_completes_credential_names(run, fake_credentials) -> None:
+    fake_credentials(["default", "lab"])
+    assert run("unifictl", "credential", "delete", "") == ["default", "lab"]
+
+
+def test_credential_set_completes_existing_credential_names(run, fake_credentials) -> None:
+    fake_credentials(["default", "lab"])
+    assert run("unifictl", "credential", "set", "") == ["default", "lab"]
+
+
+def test_global_profile_flag_completes_names(run, fake_profiles) -> None:
+    fake_profiles(["home", "work"])
+    assert run("unifictl", "--profile", "") == ["home", "work"]
+
+
+def test_profile_names_swallows_store_errors(monkeypatch) -> None:
+    # The provider imports profile_store lazily; patch the real call site.
+    import unifictl.infrastructure.profile_store as ps
+
+    def _boom() -> list[str]:
+        raise RuntimeError("store unreadable")
+
+    monkeypatch.setattr(ps, "list_profile_names", _boom)
+    assert _complete._profile_names() == []

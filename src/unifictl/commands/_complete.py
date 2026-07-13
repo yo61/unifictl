@@ -74,6 +74,27 @@ _PORT_IDX_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
     }
 )
 
+# Commands whose positional 0 is an existing profile name (`create` is excluded:
+# it takes a NEW name).
+_PROFILE_NAME_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
+    {
+        ("profile", "describe"),
+        ("profile", "edit"),
+        ("profile", "set"),
+        ("profile", "unset"),
+        ("profile", "activate"),
+        ("profile", "delete"),
+    }
+)
+
+# Commands whose positional 0 is an existing credential name.
+_CREDENTIAL_NAME_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
+    {("credential", "set"), ("credential", "delete")}
+)
+
+# (cmd_path, flag) pairs whose value is a profile name (the global --profile).
+_PROFILE_NAME_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset({((), "--profile")})
+
 # cmd_path -> primary long-form flag names, in signature order. `()` is global.
 # Guarded against drift by tests/test_completion_tree_drift.py.
 _FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
@@ -112,6 +133,26 @@ def _completion_devices() -> list[dict[str, object]]:
         if client is not None:
             with contextlib.suppress(Exception):
                 client.close()
+
+
+def _profile_names() -> list[str]:
+    """Defined profile names, or ``[]`` on any problem (TAB must never fail)."""
+    try:
+        from unifictl.infrastructure import profile_store
+
+        return profile_store.list_profile_names()
+    except Exception:
+        return []
+
+
+def _credential_names() -> list[str]:
+    """Defined credential names, or ``[]`` on any problem (TAB must never fail)."""
+    try:
+        from unifictl.infrastructure import credential_store
+
+        return credential_store.list_credential_names()
+    except Exception:
+        return []
 
 
 def _switch_macs() -> list[str]:
@@ -179,7 +220,9 @@ def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
 # a positional. Used to locate positional slots when flags are interleaved.
 # Invariant: no flag name is value-taking in one command and boolean in
 # another, so a flat set (not keyed by command) suffices to skip flag values.
-_VALUE_FLAGS: frozenset[str] = frozenset({"--switch", "--leader", "--shell", "--dest", "-d"})
+_VALUE_FLAGS: frozenset[str] = frozenset(
+    {"--switch", "--leader", "--shell", "--dest", "-d", "--profile"}
+)
 
 
 def _positional_index(tokens: list[str]) -> int:
@@ -247,11 +290,25 @@ def run(shell: str, /, *words: str) -> None:
                     for port in _port_indices(switch_mac):
                         print(port)
                 return
+            if (cmd_path, prev) in _PROFILE_NAME_FLAGS:
+                for name in _profile_names():
+                    print(name)
+                return
 
     if _positional_index(in_positionals) == 0 and cmd_path in _POSITIONAL_FIXED_VALUES:
         for value in _POSITIONAL_FIXED_VALUES[cmd_path]:
             print(value)
         return
+
+    if _positional_index(in_positionals) == 0:
+        if cmd_path in _PROFILE_NAME_COMMANDS:
+            for name in _profile_names():
+                print(name)
+            return
+        if cmd_path in _CREDENTIAL_NAME_COMMANDS:
+            for name in _credential_names():
+                print(name)
+            return
 
     port_position = _PORT_IDX_AT_POSITION.get(cmd_path)
     if port_position is not None and _positional_index(in_positionals) == port_position:
