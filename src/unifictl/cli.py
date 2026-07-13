@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import os
 import sys
-from typing import Any
+from typing import Annotated, Any
 
-from cyclopts import App
+from cyclopts import App, Parameter
 
 from unifictl import __version__
+
+
+def _apply_profile(profile: str | None) -> None:
+    """Set ``UNIFI_PROFILE`` from the ``--profile`` flag (flag beats env)."""
+    if profile is not None:
+        os.environ["UNIFI_PROFILE"] = profile
 
 
 def get_app() -> App:
@@ -32,16 +39,27 @@ def get_app() -> App:
     app.command(list_app)
     app.command(show_app)
     app.command(completion_app)
+
+    @app.meta.default
+    def _launcher(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        profile: Annotated[
+            str | None, Parameter(help="Configuration profile to use (sets UNIFI_PROFILE).")
+        ] = None,
+    ) -> None:
+        _apply_profile(profile)
+        app(tokens)
+
     return app
 
 
 def app(*args: Any, **kwargs: Any) -> Any:
-    """Invoke the CLI, building the App lazily on first call.
+    """Invoke the CLI through the meta launcher so ``--profile`` is global.
 
     Exposed as a function (not the ``App`` instance) so the lazy build stays
     transparent to callers such as ``app(["--help"])`` in tests.
     """
-    return get_app()(*args, **kwargs)
+    return get_app().meta(*args, **kwargs)
 
 
 def main() -> None:

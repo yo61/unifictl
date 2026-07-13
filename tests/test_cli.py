@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import sys
 
 import pytest
 
-from unifictl.cli import app, main
+from unifictl.cli import _apply_profile, app, get_app, main
 from unifictl.infrastructure.config import ConfigError
 
 
@@ -63,6 +64,31 @@ def test_main_refreshes_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit):
         main()
     assert called == [True]
+
+
+def test_apply_profile_sets_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
+    _apply_profile("lab")
+    assert os.environ["UNIFI_PROFILE"] == "lab"
+
+
+def test_apply_profile_none_leaves_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UNIFI_PROFILE", "keep")
+    _apply_profile(None)
+    assert os.environ["UNIFI_PROFILE"] == "keep"
+
+
+def test_profile_flag_selects_before_dispatch(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # NB: do NOT use `--help`/`--version` here — cyclopts intercepts those before
+    # the meta launcher runs, so they bypass _apply_profile. Use a real, no-network
+    # command (`completion zsh` just prints a script) so the launcher actually runs.
+    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
+    with pytest.raises(SystemExit):
+        get_app().meta(["--profile", "lab", "completion", "zsh"])
+    assert os.environ["UNIFI_PROFILE"] == "lab"
+    capsys.readouterr()  # swallow the emitted completion script
 
 
 def test_importing_cli_does_not_pull_questionary() -> None:
