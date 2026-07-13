@@ -1,15 +1,19 @@
-"""Load unifictl settings from env vars, an optional profile, and XDG TOML.
+"""Load unifictl settings from env vars, a selected profile file, and credentials.
 
-Connection and secrets (``base_url``, ``api_key``, ``site``, TLS settings) come
-from ``UNIFI_*`` environment variables or the selected profile in
-``~/.config/unifictl/config.toml``; env vars win. The profile is selected via
-``UNIFI_PROFILE`` (which the ``--profile`` flag sets) or the TOML
-``default_profile``. If any profile carries an inline ``api_key``, the file must
-be ``chmod 600`` — a group/world-readable file is refused.
+Connection fields (``base_url``, ``site``, TLS settings) resolve ``env >
+selected profile file > built-in default``. The ``api_key`` resolves
+``UNIFI_API_KEY env > credentials.toml[credential] > error``, where
+``credential`` is the profile's ``credential`` field (default ``"default"``).
+The profile is selected via ``UNIFI_PROFILE`` (which the ``--profile`` flag
+sets) or ``config.toml``'s ``default_profile``; no selection means no profile
+participates and behaviour matches the env-only setup.
 
-Operational ``switch`` resolves from the selected profile or the top-level TOML;
-``leaders`` comes from the top-level TOML only. CLI flags override both in the
-command layer. See ``decisions/2026-07-12-config-profiles-inline-secrets.md``.
+Profiles live one-per-file under ``~/.config/unifictl/profiles/<name>.toml``
+and never hold secrets. Secrets live in the single ``~/.config/unifictl/
+credentials.toml``, which must be ``chmod 600``. Operational ``switch``
+resolves from the selected profile file only; ``leaders`` comes from the
+top-level ``config.toml`` only. CLI flags override both in the command layer.
+See ``decisions/2026-07-13-separate-credential-store.md``.
 """
 
 from __future__ import annotations
@@ -48,129 +52,99 @@ def config_file_path() -> Path:
 
 
 def load_settings() -> Settings:
-    """Build :class:`Settings` from env, the selected profile, and TOML defaults.
+    """Build :class:`Settings` from env, the selected profile file, and credentials.
 
-    Each field resolves ``env var > selected profile > top-level TOML default >
-    built-in default``. The selected profile comes from ``UNIFI_PROFILE`` (which
-    the ``--profile`` flag sets) or the TOML ``default_profile``; ``None`` means
-    no profile participates and behaviour matches the env-only setup.
-
-    Returns:
-        The resolved settings.
+    Field resolution: ``env > profile file > built-in default`` for connection
+    fields; ``UNIFI_API_KEY env > credentials[credential] > error`` for the key;
+    ``leaders`` from ``config.toml``. Selection: ``UNIFI_PROFILE > default_profile
+    > none``. With no profile and no env, behaviour matches the env-only setup.
 
     Raises:
-        ConfigError: on an unknown or malformed profile, a group/world-readable
-            file holding an inline secret, or a missing ``base_url``/``api_key``.
+        ConfigError: unknown selected profile, missing ``base_url``/``api_key``,
+            or a group/world-readable ``credentials.toml``.
     """
-    path = config_file_path()
-    data = _load_toml(path)
-    profiles = load_profiles(data)
-    name, profile = _select_profile(profiles, data)
-    _enforce_secret_permissions(path, profiles)
+    name = _selected_profile_name()
+    profile = _selected_profile(name)
 
-    base_url = os.environ.get("UNIFI_BASE_URL") or _profile_str(profile, "base_url", name)
-    api_key = os.environ.get("UNIFI_API_KEY") or _profile_str(profile, "api_key", name)
+    base_url = os.environ.get("UNIFI_BASE_URL") or _pstr(profile, "base_url", name)
     if not base_url:
         raise ConfigError(_missing("UNIFI_BASE_URL", "base_url", name))
-    if not api_key:
-        raise ConfigError(_missing("UNIFI_API_KEY", "api_key", name))
+    api_key = _resolve_api_key(profile, name)
 
+    ca_cert = os.environ.get("UNIFI_CA_CERT") or _pstr(profile, "ca_cert", name)
+    timeout_ms = _resolve_int("UNIFI_TIMEOUT_MS", profile, "timeout_ms", name, DEFAULT_TIMEOUT_MS)
     return Settings(
         base_url=base_url,
         api_key=api_key,
-        site=os.environ.get("UNIFI_SITE") or _profile_str(profile, "site", name) or "default",
-        ca_cert=_optional_path(
-            os.environ.get("UNIFI_CA_CERT") or _profile_str(profile, "ca_cert", name)
-        ),
+        site=os.environ.get("UNIFI_SITE") or _pstr(profile, "site", name) or "default",
+        ca_cert=_optional_path(ca_cert),
         insecure_tls=_resolve_bool("UNIFI_INSECURE_TLS", profile, "insecure_tls", name),
-        timeout_ms=_resolve_int(
-            "UNIFI_TIMEOUT_MS", profile, "timeout_ms", name, DEFAULT_TIMEOUT_MS
-        ),
-        switch=_profile_str(profile, "switch", name) or _toml_str(data, "switch"),
-        leaders=_toml_leaders(data),
+        timeout_ms=timeout_ms,
+        switch=_pstr(profile, "switch", name),
+        leaders=_toml_leaders(_load_toml(config_file_path())),
     )
 
 
-def _load_toml(path: Path) -> dict[str, object]:
-    if not path.exists():
-        return {}
-    with path.open("rb") as fh:
-        return tomllib.load(fh)
+def _selected_profile_name() -> str | None:
+    """Return the selected profile name, or ``None`` if none is selected."""
+    from unifictl.infrastructure import profile_store
+
+    return os.environ.get("UNIFI_PROFILE") or profile_store.default_profile_name()
 
 
-_PROFILE_KEYS = frozenset(
-    {"base_url", "api_key", "site", "ca_cert", "insecure_tls", "timeout_ms", "switch"}
-)
-
-
-def read_config() -> dict[str, object]:
-    """Return the parsed ``config.toml`` mapping (empty when the file is absent)."""
-    return _load_toml(config_file_path())
-
-
-def load_profiles(data: dict[str, object]) -> dict[str, dict[str, object]]:
-    """Extract and structurally validate the ``[profiles.*]`` tables.
+def _selected_profile(name: str | None) -> dict[str, object]:
+    """Return the selected profile's fields (``{}`` if none selected).
 
     Args:
-        data: The parsed ``config.toml`` mapping.
+        name: The selected profile's name, or ``None``.
 
     Returns:
-        A mapping of profile name to its key/value table.
+        The profile's key/value table.
 
     Raises:
-        ConfigError: if ``profiles`` is not a table, a profile is not a table, or
-            a profile contains a key outside :data:`_PROFILE_KEYS`.
+        ConfigError: if ``name`` is set but no such profile exists.
     """
-    raw = data.get("profiles")
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise ConfigError(f"config.toml: profiles must be a table, got {raw!r}")
-    profiles: dict[str, dict[str, object]] = {}
-    for name, table in raw.items():
-        if not isinstance(table, dict):
-            raise ConfigError(f"config.toml: profile {name!r} must be a table, got {table!r}")
-        unknown = set(table) - _PROFILE_KEYS
-        if unknown:
-            keys = ", ".join(sorted(unknown))
-            raise ConfigError(f"config.toml: profile {name!r} has unknown key(s): {keys}")
-        profiles[str(name)] = {str(key): value for key, value in table.items()}
-    return profiles
+    from unifictl.infrastructure import profile_store
 
-
-def _select_profile(
-    profiles: dict[str, dict[str, object]], data: dict[str, object]
-) -> tuple[str | None, dict[str, object]]:
-    """Resolve the selected profile name and table.
-
-    Args:
-        profiles: Parsed ``[profiles.*]`` tables, keyed by name.
-        data: The parsed ``config.toml`` mapping (for ``default_profile``).
-
-    Returns:
-        A ``(name, profile)`` pair. ``name`` is ``None`` and ``profile`` is empty
-        when no profile is selected.
-
-    Raises:
-        ConfigError: if the selected profile name is not among ``profiles``.
-    """
-    name = os.environ.get("UNIFI_PROFILE") or _toml_str(data, "default_profile")
     if name is None:
-        return None, {}
-    if name not in profiles:
-        available = ", ".join(sorted(profiles)) or "(none)"
+        return {}
+    if not profile_store.profile_exists(name):
+        available = ", ".join(profile_store.list_profile_names()) or "(none)"
         raise ConfigError(f"unknown profile {name!r}; available: {available}")
-    return name, profiles[name]
+    return profile_store.read_profile(name)
 
 
-def _missing(env_name: str, key: str, name: str | None) -> str:
-    """Build a ``ConfigError`` message for a required field with no value."""
+def _resolve_api_key(profile: dict[str, object], name: str | None) -> str:
+    """Resolve the API key: env var, then the profile's bound credential.
+
+    Args:
+        profile: The selected profile's key/value table (empty if none selected).
+        name: The selected profile's name, for error messages.
+
+    Returns:
+        The resolved API key.
+
+    Raises:
+        ConfigError: if neither the env var nor the credential holds a key.
+    """
+    from unifictl.infrastructure import credential_store
+
+    env = os.environ.get("UNIFI_API_KEY")
+    if env:
+        return env
+    credential = _pstr(profile, "credential", name) or "default"
+    key = credential_store.get_api_key(credential)
+    if key:
+        return key
     if name is None:
-        return f"{env_name} is not set"
-    return f"{env_name} is not set and profile {name!r} does not define {key!r}"
+        raise ConfigError("UNIFI_API_KEY is not set")
+    raise ConfigError(
+        f"UNIFI_API_KEY is not set and credential {credential!r} has no api_key; "
+        f"run: unifictl credential set {credential}"
+    )
 
 
-def _profile_str(profile: dict[str, object], key: str, name: str | None) -> str | None:
+def _pstr(profile: dict[str, object], key: str, name: str | None) -> str | None:
     """Read a string field from the selected profile.
 
     Args:
@@ -188,10 +162,22 @@ def _profile_str(profile: dict[str, object], key: str, name: str | None) -> str 
     if value is None:
         return None
     if not isinstance(value, str):
-        raise ConfigError(
-            f"config.toml: profile {name!r} key {key!r} must be a string, got {value!r}"
-        )
+        raise ConfigError(f"profile {name!r} key {key!r} must be a string, got {value!r}")
     return value
+
+
+def _missing(env_name: str, key: str, name: str | None) -> str:
+    """Build a ``ConfigError`` message for a required field with no value."""
+    if name is None:
+        return f"{env_name} is not set"
+    return f"{env_name} is not set and profile {name!r} does not define {key!r}"
+
+
+def _load_toml(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    with path.open("rb") as fh:
+        return tomllib.load(fh)
 
 
 def _resolve_bool(env_name: str, profile: dict[str, object], key: str, name: str | None) -> bool:
@@ -216,9 +202,7 @@ def _resolve_bool(env_name: str, profile: dict[str, object], key: str, name: str
     if value is None:
         return False
     if not isinstance(value, bool):
-        raise ConfigError(
-            f"config.toml: profile {name!r} key {key!r} must be a boolean, got {value!r}"
-        )
+        raise ConfigError(f"profile {name!r} key {key!r} must be a boolean, got {value!r}")
     return value
 
 
@@ -251,44 +235,12 @@ def _resolve_int(
     if value is None:
         return default
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ConfigError(
-            f"config.toml: profile {name!r} key {key!r} must be an integer, got {value!r}"
-        )
+        raise ConfigError(f"profile {name!r} key {key!r} must be an integer, got {value!r}")
     return value
-
-
-def _enforce_secret_permissions(path: Path, profiles: dict[str, dict[str, object]]) -> None:
-    """Refuse a group/world-readable config file that holds an inline secret.
-
-    Args:
-        path: The config file path.
-        profiles: The parsed profile tables.
-
-    Raises:
-        ConfigError: if the file is group/world-readable and any profile carries
-            an inline ``api_key``.
-    """
-    if not path.exists():
-        return
-    if not any("api_key" in table for table in profiles.values()):
-        return
-    if path.stat().st_mode & 0o077:
-        raise ConfigError(
-            f"{path} is group/world-readable but holds an inline api_key; run: chmod 600 {path}"
-        )
 
 
 def _optional_path(raw: str | None) -> Path | None:
     return Path(raw).expanduser() if raw else None
-
-
-def _toml_str(data: dict[str, object], key: str) -> str | None:
-    value = data.get(key)
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ConfigError(f"config.toml: {key} must be a string, got {value!r}")
-    return value
 
 
 def _toml_leaders(data: dict[str, object]) -> tuple[int, ...]:

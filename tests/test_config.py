@@ -1,12 +1,11 @@
-"""Tests for settings loading (env secrets + XDG TOML operational params)."""
+"""Tests for settings loading (env, profile files, and the credentials store)."""
 
 from __future__ import annotations
 
-import os as _os
-
 import pytest
 
-from unifictl.infrastructure.config import ConfigError, load_profiles, load_settings, read_config
+from unifictl.infrastructure import credential_store, profile_store
+from unifictl.infrastructure.config import ConfigError, load_settings
 
 
 def _base_env(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
@@ -45,11 +44,10 @@ def test_toml_operational_params(monkeypatch: pytest.MonkeyPatch, tmp_path) -> N
     cfg = tmp_path / "unifictl"
     cfg.mkdir()
     (cfg / "config.toml").write_text(
-        'switch = "70:a7:41:90:82:dd"\nleaders = [17, 19, 21]\n',
+        "leaders = [17, 19, 21]\n",
         encoding="utf-8",
     )
     settings = load_settings()
-    assert settings.switch == "70:a7:41:90:82:dd"
     assert settings.leaders == (17, 19, 21)
 
 
@@ -69,132 +67,69 @@ def test_env_timeout_invalid_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: o
         load_settings()
 
 
-def test_load_profiles_empty_when_absent() -> None:
-    assert load_profiles({}) == {}
+def _profile(tmp_path, name: str, body: str) -> None:
+    d = tmp_path / "unifictl" / "profiles"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{name}.toml").write_text(body, encoding="utf-8")
 
 
-def test_load_profiles_returns_named_tables() -> None:
-    data = {"profiles": {"home": {"base_url": "https://gw", "switch": "aa:bb"}}}
-    assert load_profiles(data) == {"home": {"base_url": "https://gw", "switch": "aa:bb"}}
-
-
-def test_load_profiles_rejects_unknown_key() -> None:
-    data = {"profiles": {"home": {"leaders": [1, 3]}}}
-    with pytest.raises(ConfigError, match=r"home.*leaders"):
-        load_profiles(data)
-
-
-def test_load_profiles_rejects_non_table_profile() -> None:
-    with pytest.raises(ConfigError, match=r"home.*table"):
-        load_profiles({"profiles": {"home": "nope"}})
-
-
-def test_read_config_absent_returns_empty(monkeypatch, tmp_path) -> None:
+def test_profile_file_supplies_connection(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert read_config() == {}
-
-
-def _write_config(tmp_path, body: str) -> None:
-    cfg = tmp_path / "unifictl"
-    cfg.mkdir(exist_ok=True)
-    config_path = cfg / "config.toml"
-    config_path.write_text(body, encoding="utf-8")
-    _os.chmod(config_path, 0o600)  # tests opt into a laxer mode explicitly when needed
-
-
-def test_profile_supplies_connection(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    for var in ("UNIFI_BASE_URL", "UNIFI_API_KEY", "UNIFI_SITE"):
-        monkeypatch.delenv(var, raising=False)
+    for v in ("UNIFI_BASE_URL", "UNIFI_API_KEY", "UNIFI_SITE"):
+        monkeypatch.delenv(v, raising=False)
     monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(
-        tmp_path,
-        "[profiles.home]\n"
-        'base_url = "https://home"\napi_key = "hk"\nsite = "s1"\nswitch = "aa:bb"\n',
-    )
-    settings = load_settings()
-    assert (settings.base_url, settings.api_key, settings.site, settings.switch) == (
-        "https://home",
-        "hk",
-        "s1",
-        "aa:bb",
-    )
+    _profile(tmp_path, "home", 'base_url = "https://home"\nsite = "s1"\nswitch = "aa:bb"\n')
+    credential_store.set_credential("default", "hk")
+    s = load_settings()
+    assert (s.base_url, s.api_key, s.site, s.switch) == ("https://home", "hk", "s1", "aa:bb")
 
 
-def test_env_overrides_profile(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)  # sets UNIFI_BASE_URL=https://gw, UNIFI_API_KEY=secret
-    monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
-    settings = load_settings()
-    assert settings.base_url == "https://gw"  # env wins over profile
-    assert settings.api_key == "secret"
-
-
-def test_default_profile_used_when_unifi_profile_absent(monkeypatch, tmp_path) -> None:
+def test_named_credential(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    for var in ("UNIFI_BASE_URL", "UNIFI_API_KEY"):
-        monkeypatch.delenv(var, raising=False)
-    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
-    _write_config(
-        tmp_path,
-        'default_profile = "home"\n[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n',
-    )
-    assert load_settings().base_url == "https://home"
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
+    monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
+    monkeypatch.setenv("UNIFI_PROFILE", "office")
+    _profile(tmp_path, "office", 'credential = "work"\n')
+    credential_store.set_credential("work", "wk")
+    assert load_settings().api_key == "wk"
 
 
-def test_unknown_profile_raises(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("UNIFI_PROFILE", "ghost")
-    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
-    with pytest.raises(ConfigError, match=r"unknown profile 'ghost'.*home"):
-        load_settings()
+def test_env_api_key_beats_credential(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
+    monkeypatch.setenv("UNIFI_API_KEY", "envkey")
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    _profile(tmp_path, "home", "")
+    credential_store.set_credential("default", "credkey")
+    assert load_settings().api_key == "envkey"
 
 
-def test_missing_secret_names_profile(monkeypatch, tmp_path) -> None:
+def test_missing_credential_names_command(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.delenv("UNIFI_API_KEY", raising=False)
     monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
     monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\n')
-    with pytest.raises(ConfigError, match=r"UNIFI_API_KEY.*home.*api_key"):
+    _profile(tmp_path, "home", "")
+    with pytest.raises(ConfigError, match="credential set"):
         load_settings()
 
 
-def test_profile_switch_type_error_names_profile(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, "[profiles.home]\nswitch = 42\n")
-    with pytest.raises(ConfigError, match=r"home.*switch.*string"):
+def test_unknown_profile_lists_available(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
+    monkeypatch.setenv("UNIFI_API_KEY", "k")
+    monkeypatch.setenv("UNIFI_PROFILE", "ghost")
+    _profile(tmp_path, "home", "")
+    with pytest.raises(ConfigError, match=r"unknown profile 'ghost'.*home"):
         load_settings()
 
 
-def test_world_readable_secret_refused(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
-    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o644)
-    with pytest.raises(ConfigError, match="chmod 600"):
-        load_settings()
-
-
-def test_world_readable_without_secret_is_allowed(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)  # secrets come from env, not the file
-    _write_config(tmp_path, 'switch = "aa:bb"\n[profiles.home]\nbase_url = "https://home"\n')
-    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o644)
-    assert load_settings().switch == "aa:bb"  # no refusal
-
-
-def test_secret_with_0600_is_allowed(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
-    _os.chmod(tmp_path / "unifictl" / "config.toml", 0o600)
-    assert load_settings().api_key == "secret"  # env still wins; no refusal
-
-
-def test_env_insecure_false_beats_profile_true(monkeypatch, tmp_path) -> None:
-    _base_env(monkeypatch, tmp_path)
-    monkeypatch.setenv("UNIFI_PROFILE", "home")
-    monkeypatch.setenv("UNIFI_INSECURE_TLS", "false")
-    _write_config(tmp_path, "[profiles.home]\ninsecure_tls = true\n")
-    assert load_settings().insecure_tls is False
+def test_default_profile_from_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
+    monkeypatch.delenv("UNIFI_BASE_URL", raising=False)
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
+    _profile(tmp_path, "home", 'base_url = "https://home"\n')
+    credential_store.set_credential("default", "hk")
+    profile_store.set_default_profile("home")
+    assert load_settings().base_url == "https://home"
