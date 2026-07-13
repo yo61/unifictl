@@ -63,8 +63,44 @@ Connection and secrets come from the environment (never committed), matching
 | `UNIFI_INSECURE_TLS` | Last-resort TLS bypass |
 | `UNIFI_TIMEOUT_MS` | Per-request timeout (default `30000`) |
 
-Operational parameters (switch MAC and LAG leader ports) live in an
-XDG TOML file at `~/.config/unifictl/config.toml`; CLI flags override them.
+Operational parameters (switch MAC and LAG leader ports) live in an XDG TOML file
+at `~/.config/unifictl/config.toml`; CLI flags override them.
+
+### Profiles
+
+To point `unifictl` at different targets, define named profiles in the same file.
+A profile holds the connection identity — `base_url`, `api_key`, `site`, TLS
+settings, and the `switch` to operate on:
+
+```toml
+default_profile = "home"           # optional; used when --profile is omitted
+
+[profiles.home]
+base_url = "https://192.168.1.1"
+api_key  = "…"
+switch   = "aa:bb:cc:dd:ee:ff"
+
+[profiles.lab]
+base_url = "https://10.0.0.1"
+api_key  = "…"
+```
+
+Select a profile with `--profile NAME` (global flag), the `UNIFI_PROFILE`
+environment variable, or `default_profile`. Each field resolves
+`CLI flag > env var > profile > built-in default`, so an explicit `--switch` or
+`UNIFI_*` still overrides the profile. `leaders` is not a profile field — it stays
+a `--leader` flag with the top-level `leaders` default, because LAG membership
+changes over time.
+
+Because a profile stores an API key, `config.toml` must be `chmod 600` when it
+holds one; `unifictl` refuses a group/world-readable file in that case. Scaffold a
+block with:
+
+```sh
+unifictl profile example home >> ~/.config/unifictl/config.toml && chmod 600 ~/.config/unifictl/config.toml
+unifictl profile list          # names + default + base_url
+unifictl profile show home     # fields, api_key redacted
+```
 
 ## Development
 
