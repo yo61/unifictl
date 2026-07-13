@@ -42,7 +42,7 @@ def list_() -> None:
     for name in sorted(profiles):
         marker = " (default)" if name == default else ""
         base_url = profiles[name].get("base_url", "—")
-        _console.print(f"{name}{marker}: {base_url}")
+        _console.print(f"{name}{marker}: {base_url}", markup=False)
 
 
 @app.command(name="show")
@@ -67,7 +67,7 @@ def show(name: str, /) -> None:
         value = table[key]
         if key == "api_key":
             value = _redact(str(value))
-        _console.print(f"{key} = {value!r}")
+        _console.print(f"{key} = {value!r}", markup=False)
 
 
 @app.command(name="example")

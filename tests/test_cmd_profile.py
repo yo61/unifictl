@@ -49,6 +49,22 @@ def test_show_redacts_api_key(monkeypatch, tmp_path, capsys) -> None:
     assert "https://home" in out
 
 
+def test_list_does_not_corrupt_bracketed_url(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://[fe80::1]"\n')
+    profile.list_()
+    out = capsys.readouterr().out
+    assert "https://[fe80::1]" in out
+
+
+def test_show_does_not_corrupt_bracketed_url(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _write_config(tmp_path, '[profiles.home]\nbase_url = "https://[fe80::1]"\n')
+    profile.show("home")
+    out = capsys.readouterr().out
+    assert "https://[fe80::1]" in out
+
+
 def test_show_unknown_name_raises(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\n')
