@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import tomllib
+
 import pytest
 
-from unifictl.commands import profile
+from unifictl.commands import _editor, profile
 from unifictl.infrastructure import credential_store, profile_store
 from unifictl.infrastructure.config import ConfigError
 
@@ -47,3 +49,47 @@ def test_describe_unknown_raises(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     with pytest.raises(ConfigError, match="unknown profile 'ghost'"):
         profile.describe("ghost")
+
+
+def test_create_writes_profile_and_prompts_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    # fake editor: user accepts a valid non-secret profile
+    monkeypatch.setattr(
+        _editor, "edit_toml", lambda initial, validate: 'base_url = "https://h"\nswitch = "aa"\n'
+    )
+    monkeypatch.setattr(profile, "_prompt_key", lambda: "newkey")
+    profile.create("home")
+    body = (tmp_path / "unifictl" / "profiles" / "home.toml").read_text()
+    parsed = tomllib.loads(body)
+    assert parsed == {"base_url": "https://h", "switch": "aa"}
+    assert "api_key" not in body  # secret never in the profile file
+    assert credential_store.get_api_key("default") == "newkey"
+
+
+def test_create_reuses_existing_credential(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    credential_store.set_credential("default", "existing")
+    monkeypatch.setattr(_editor, "edit_toml", lambda initial, validate: 'base_url = "https://h"\n')
+    called = []
+    monkeypatch.setattr(profile, "_prompt_key", lambda: called.append(True) or "x")
+    profile.create("home")
+    assert called == []  # did not prompt; reused existing credential
+    assert credential_store.get_api_key("default") == "existing"
+
+
+def test_create_aborts_when_editor_returns_none(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(_editor, "edit_toml", lambda initial, validate: None)
+    profile.create("home")
+    assert not profile_store.profile_exists("home")
+    assert "aborted" in capsys.readouterr().out
+
+
+def test_edit_validates_and_writes(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://old"\n')
+    monkeypatch.setattr(
+        _editor, "edit_toml", lambda initial, validate: 'base_url = "https://new"\n'
+    )
+    profile.edit("home")
+    assert profile_store.read_profile("home")["base_url"] == "https://new"
