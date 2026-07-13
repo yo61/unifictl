@@ -79,7 +79,9 @@ separate `~/.config/unifictl/credentials.toml` (`0600`, the only secret file):
 base_url = "https://192.168.1.1"
 switch   = "aa:bb:cc:dd:ee:ff"
 # credential = "default"      # which credentials.toml section holds the key
+```
 
+```toml
 # ~/.config/unifictl/credentials.toml      (chmod 600)
 [default]
 api_key = "…"
@@ -92,8 +94,8 @@ resolve `CLI > env > profile > built-in`; the api_key resolves
 `UNIFI_API_KEY > credentials[credential] > error`.
 
 ```sh
-unifictl profile create home        # opens $EDITOR for the non-secret fields,
-                                     # then prompts (hidden) for the API key
+unifictl profile create home        # opens $VISUAL or $EDITOR for the non-secret
+                                     # fields, then prompts (hidden) for the API key
 unifictl profile list
 unifictl profile describe home       # fields + redacted key
 unifictl profile set home switch aa:bb:cc:dd:ee:ff
