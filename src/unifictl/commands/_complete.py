@@ -13,7 +13,7 @@ from unifictl.infrastructure.client import UnifiClient
 from unifictl.infrastructure.config import load_settings
 
 # Top-level visible commands (the hidden __complete is intentionally absent).
-_TOP_LEVEL_COMMANDS: frozenset[str] = frozenset({"set", "list", "show", "completion"})
+_TOP_LEVEL_COMMANDS: frozenset[str] = frozenset({"set", "list", "show", "completion", "profile"})
 
 # Sub-command names under each grouping command.
 _SUB_APP_NAMES: dict[str, frozenset[str]] = {
@@ -21,6 +21,7 @@ _SUB_APP_NAMES: dict[str, frozenset[str]] = {
     "list": frozenset({"devices"}),
     "show": frozenset({"port"}),
     "completion": frozenset({"bash", "fish", "zsh", "install"}),
+    "profile": frozenset({"list", "show", "example"}),
 }
 
 # cmd_path -> fixed positional-0 candidates (e.g. `set lag on|off`).

@@ -52,7 +52,13 @@ def test_main_complete_fast_path(
 ) -> None:
     monkeypatch.setattr(sys, "argv", ["unifictl", "__complete", "zsh", "unifictl", ""])
     main()
-    assert set(capsys.readouterr().out.split()) == {"set", "list", "show", "completion"}
+    assert set(capsys.readouterr().out.split()) == {
+        "set",
+        "list",
+        "show",
+        "completion",
+        "profile",
+    }
 
 
 def test_main_refreshes_stubs(monkeypatch: pytest.MonkeyPatch) -> None:

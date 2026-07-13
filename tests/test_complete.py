@@ -19,7 +19,11 @@ def run(capsys: pytest.CaptureFixture[str]):
 
 
 def test_top_level_commands(run) -> None:
-    assert set(run("unifictl", "")) == {"set", "list", "show", "completion"}
+    assert set(run("unifictl", "")) == {"set", "list", "show", "completion", "profile"}
+
+
+def test_profile_subcommands(run) -> None:
+    assert set(run("unifictl", "profile", "")) == {"list", "show", "example"}
 
 
 def test_set_subcommands(run) -> None:
