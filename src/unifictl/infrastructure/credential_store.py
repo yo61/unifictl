@@ -6,6 +6,7 @@ unifictl file that stores secrets, and the only one required to be ``0600``.
 
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 
@@ -18,6 +19,19 @@ from unifictl.infrastructure.config import ConfigError
 def credentials_path() -> Path:
     """Return the path to ``credentials.toml``."""
     return xdg_config_home() / "unifictl" / "credentials.toml"
+
+
+def _write_0600(path: Path, text: str) -> None:
+    """Write text to path, ensuring the file is 0600 from creation (no window).
+
+    ``os.open`` with an explicit mode applies ``0600`` atomically when the file is
+    created (umask does not widen 0600). The trailing ``chmod`` tightens the case
+    where the file pre-existed with looser permissions.
+    """
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    path.chmod(0o600)
 
 
 def read_credentials() -> dict[str, dict[str, object]]:
@@ -64,8 +78,7 @@ def set_credential(name: str, api_key: str) -> None:
         table = tomlkit.table()
         doc[name] = table
     table["api_key"] = api_key
-    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    path.chmod(0o600)
+    _write_0600(path, tomlkit.dumps(doc))
 
 
 def delete_credential(name: str) -> bool:
@@ -77,8 +90,7 @@ def delete_credential(name: str) -> bool:
     if name not in doc:
         return False
     del doc[name]
-    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    path.chmod(0o600)
+    _write_0600(path, tomlkit.dumps(doc))
     return True
 
 
