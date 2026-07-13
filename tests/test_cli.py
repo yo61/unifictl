@@ -58,6 +58,7 @@ def test_main_complete_fast_path(
         "show",
         "completion",
         "profile",
+        "credential",
     }
 
 
