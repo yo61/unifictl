@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import tomllib
+
 import pytest
 
 from unifictl.commands import profile
@@ -63,3 +65,24 @@ def test_show_redacts_non_string_api_key(monkeypatch, tmp_path, capsys) -> None:
     profile.show("home")
     out = capsys.readouterr().out
     assert "12345" not in out  # the raw (non-string) key must not appear in full
+
+
+def test_example_prints_valid_toml_block(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    profile.example("home")
+    out = capsys.readouterr().out
+    assert "[profiles.home]" in out
+    assert "chmod 600" in out
+    parsed = tomllib.loads(out)  # the emitted block must round-trip
+    assert set(parsed["profiles"]["home"]) <= {
+        "base_url",
+        "api_key",
+        "site",
+        "switch",
+    }  # only uncommented keys parse; commented ones are absent
+
+
+def test_example_defaults_name(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    profile.example()
+    assert "[profiles.example]" in capsys.readouterr().out
