@@ -48,8 +48,8 @@ def show(name: str, /) -> None:
         if key not in table:
             continue
         value = table[key]
-        if key == "api_key" and isinstance(value, str):
-            value = _redact(value)
+        if key == "api_key":
+            value = _redact(str(value))
         _console.print(f"{key} = {value!r}")
 
 

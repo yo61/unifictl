@@ -52,3 +52,14 @@ def test_show_unknown_name_raises(monkeypatch, tmp_path) -> None:
     _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\n')
     with pytest.raises(ConfigError, match=r"unknown profile 'ghost'.*home"):
         profile.show("ghost")
+
+
+def test_show_redacts_non_string_api_key(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _write_config(
+        tmp_path,
+        '[profiles.home]\nbase_url = "https://home"\napi_key = 12345\n',
+    )
+    profile.show("home")
+    out = capsys.readouterr().out
+    assert "12345" not in out  # the raw (non-string) key must not appear in full
