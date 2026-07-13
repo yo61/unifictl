@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/yo61/unifictl/compare/v0.3.1...v0.4.0) (2026-07-13)
+
+
+### Features
+
+* configuration profiles with a separate credential store ([abce28a](https://github.com/yo61/unifictl/commit/abce28ab4d8d73a01ad8bbcefb2f8cbb8aa98d2d))
+
 ## [0.3.1](https://github.com/yo61/unifictl/compare/v0.3.0...v0.3.1) (2026-07-11)
 
 
