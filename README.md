@@ -52,8 +52,8 @@ candidates rather than blocking your shell.
 ## Configuration
 
 Connection and secrets come from the environment or a selected profile (see
-Profiles below); env vars are never committed and take precedence over profile
-values. Matching `unifi-mcp`:
+Profiles & credentials below); env vars are never committed and take precedence
+over profile values. Matching `unifi-mcp`:
 
 | Variable | Purpose |
 | --- | --- |
@@ -64,43 +64,42 @@ values. Matching `unifi-mcp`:
 | `UNIFI_INSECURE_TLS` | Last-resort TLS bypass |
 | `UNIFI_TIMEOUT_MS` | Per-request timeout (default `30000`) |
 
-Operational parameters (switch MAC and LAG leader ports) live in an XDG TOML file
-at `~/.config/unifictl/config.toml`; CLI flags override them.
+LAG leader ports live in an XDG TOML file at `~/.config/unifictl/config.toml`
+(`leaders = [1, 2]`); CLI flags override them. The switch MAC is a profile field
+(see below), not a `config.toml` setting.
 
-### Profiles
+### Profiles & credentials
 
-To point `unifictl` at different targets, define named profiles in the same file.
-A profile holds the connection identity — `base_url`, `api_key`, `site`, TLS
-settings, and the `switch` to operate on:
+Point `unifictl` at different targets with named profiles. Non-secret config lives
+one-file-per-profile under `~/.config/unifictl/profiles/`; the API key lives in a
+separate `~/.config/unifictl/credentials.toml` (`0600`, the only secret file):
 
 ```toml
-default_profile = "home"           # optional; used when --profile is omitted
-
-[profiles.home]
+# ~/.config/unifictl/profiles/home.toml   (safe to share)
 base_url = "https://192.168.1.1"
-api_key  = "…"
 switch   = "aa:bb:cc:dd:ee:ff"
+# credential = "default"      # which credentials.toml section holds the key
 
-[profiles.lab]
-base_url = "https://10.0.0.1"
-api_key  = "…"
+# ~/.config/unifictl/credentials.toml      (chmod 600)
+[default]
+api_key = "…"
 ```
 
-Select a profile with `--profile NAME` (global flag), the `UNIFI_PROFILE`
-environment variable, or `default_profile`. Each field resolves
-`CLI flag > env var > profile > built-in default`, so an explicit `--switch` or
-`UNIFI_*` still overrides the profile. `leaders` is not a profile field — it stays
-a `--leader` flag with the top-level `leaders` default, because LAG membership
-changes over time.
-
-When any profile in the file stores an inline `api_key`, `config.toml` must be
-`chmod 600`; `unifictl` refuses a group/world-readable file in that case.
-Scaffold a block with:
+A profile's `credential` defaults to `default`, so one controller/key backs many
+per-switch profiles with no duplication. Select a profile with `--profile NAME`,
+`UNIFI_PROFILE`, or `profile activate NAME` (writes `default_profile`). Fields
+resolve `CLI > env > profile > built-in`; the api_key resolves
+`UNIFI_API_KEY > credentials[credential] > error`.
 
 ```sh
-unifictl profile example home >> ~/.config/unifictl/config.toml && chmod 600 ~/.config/unifictl/config.toml
-unifictl profile list          # names + default + base_url
-unifictl profile show home     # fields, api_key redacted
+unifictl profile create home        # opens $EDITOR for the non-secret fields,
+                                     # then prompts (hidden) for the API key
+unifictl profile list
+unifictl profile describe home       # fields + redacted key
+unifictl profile set home switch aa:bb:cc:dd:ee:ff
+unifictl profile activate home
+unifictl credential set default      # rotate the shared key, once
+unifictl credential list
 ```
 
 ## Development
