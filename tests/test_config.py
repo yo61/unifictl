@@ -190,3 +190,11 @@ def test_secret_with_0600_is_allowed(monkeypatch, tmp_path) -> None:
     _write_config(tmp_path, '[profiles.home]\nbase_url = "https://home"\napi_key = "hk"\n')
     _os.chmod(tmp_path / "unifictl" / "config.toml", 0o600)
     assert load_settings().api_key == "secret"  # env still wins; no refusal
+
+
+def test_env_insecure_false_beats_profile_true(monkeypatch, tmp_path) -> None:
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("UNIFI_PROFILE", "home")
+    monkeypatch.setenv("UNIFI_INSECURE_TLS", "false")
+    _write_config(tmp_path, "[profiles.home]\ninsecure_tls = true\n")
+    assert load_settings().insecure_tls is False
