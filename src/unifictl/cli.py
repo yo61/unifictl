@@ -27,6 +27,7 @@ def get_app() -> App:
     """
     from unifictl.commands.completion import app as completion_app
     from unifictl.commands.list_ import app as list_app
+    from unifictl.commands.profile import app as profile_app
     from unifictl.commands.set import app as set_app
     from unifictl.commands.show import app as show_app
 
@@ -38,6 +39,7 @@ def get_app() -> App:
     app.command(set_app)
     app.command(list_app)
     app.command(show_app)
+    app.command(profile_app)
     app.command(completion_app)
 
     @app.meta.default
