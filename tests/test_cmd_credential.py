@@ -17,7 +17,7 @@ def test_set_from_stdin(monkeypatch, tmp_path, capsys) -> None:
 
 def test_set_hidden_prompt(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setattr(credential, "_prompt_key", lambda: "prompted")
+    monkeypatch.setattr(credential, "prompt_api_key", lambda: "prompted")
     credential.set_("work")
     assert credential_store.get_api_key("work") == "prompted"
 

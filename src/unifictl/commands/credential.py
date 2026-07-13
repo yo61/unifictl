@@ -8,15 +8,12 @@ import questionary
 from cyclopts import App
 from rich.console import Console
 
+from unifictl.commands._prompt import prompt_api_key
 from unifictl.infrastructure import credential_store
 from unifictl.infrastructure.config import ConfigError
 
 app = App(name="credential", help="Manage API keys (credentials.toml, 0600).")
 _console = Console()
-
-
-def _prompt_key() -> str:
-    return str(questionary.password("API key:").ask() or "")
 
 
 @app.command(name="set")
@@ -27,7 +24,7 @@ def set_(name: str = "default", /, *, stdin: bool = False) -> None:
         name: Credential section name. Defaults to ``default``.
         stdin: Read the key from stdin instead of a hidden prompt.
     """
-    key = sys.stdin.readline().strip() if stdin else _prompt_key()
+    key = sys.stdin.readline().strip() if stdin else prompt_api_key()
     if not key:
         raise ConfigError("no API key provided")
     credential_store.set_credential(name, key)

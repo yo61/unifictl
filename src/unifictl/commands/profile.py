@@ -10,6 +10,7 @@ from cyclopts import App
 from rich.console import Console
 
 from unifictl.commands import _editor
+from unifictl.commands._prompt import prompt_api_key
 from unifictl.infrastructure import credential_store, profile_store
 from unifictl.infrastructure.config import ConfigError
 
@@ -68,10 +69,6 @@ def _redact(value: str) -> str:
     return f"…{value[-4:]}" if len(value) > 4 else "****"
 
 
-def _prompt_key() -> str:
-    return str(questionary.password("API key:").ask() or "")
-
-
 def _validate_profile_text(text: str) -> None:
     """Validate edited profile TOML: parseable, no api_key, only allowed keys.
 
@@ -106,7 +103,7 @@ def create(name: str, /) -> None:
     new_profile = profile_store.read_profile(name)
     credential = str(new_profile.get("credential") or "default")
     if credential_store.get_api_key(credential) is None:
-        key = _prompt_key()
+        key = prompt_api_key()
         if key:
             credential_store.set_credential(credential, key)
         else:
