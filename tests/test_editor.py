@@ -42,3 +42,42 @@ def test_reopens_on_validation_error_then_aborts(monkeypatch, tmp_path) -> None:
         raise ConfigError("bad")
 
     assert _editor.edit_toml("broken\n", validate=always_fail) is None
+
+
+def test_editor_nonzero_exit_aborts(monkeypatch, tmp_path) -> None:
+    # editor exits non-zero (e.g. vim ":cq") → treated as abort, no traceback
+    _fake_editor("import sys\nsys.exit(1)\n", monkeypatch, tmp_path)
+    assert _editor.edit_toml("x = 1\n", validate=lambda _t: None) is None
+
+
+def test_uses_editor_env_fallback(monkeypatch, tmp_path) -> None:
+    # VISUAL unset, EDITOR set: helper falls back to $EDITOR
+    editor = tmp_path / "fake-editor.py"
+    editor.write_text(
+        'import sys\np = sys.argv[1]\nopen(p, "a").write(\'switch = "aa"\\n\')\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("VISUAL", raising=False)
+    monkeypatch.setenv("EDITOR", f"python {editor}")
+    out = _editor.edit_toml('base_url = "https://h"\n', validate=lambda _t: None)
+    assert out is not None
+    assert 'switch = "aa"' in out
+
+
+def test_reopens_on_validation_error_then_succeeds(monkeypatch, tmp_path) -> None:
+    # editor makes a change each invocation; validate fails once, then passes
+    _fake_editor(
+        'import sys\np = sys.argv[1]\nopen(p, "a").write("\\n# edited\\n")\n',
+        monkeypatch,
+        tmp_path,
+    )
+    calls = []
+
+    def fail_once_then_pass(text: str) -> None:
+        calls.append(text)
+        if len(calls) == 1:
+            raise ConfigError("bad")
+
+    out = _editor.edit_toml("base_url = 1\n", validate=fail_once_then_pass)
+    assert out is not None
+    assert len(calls) == 2

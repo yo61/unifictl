@@ -77,6 +77,17 @@ def test_create_reuses_existing_credential(monkeypatch, tmp_path) -> None:
     assert credential_store.get_api_key("default") == "existing"
 
 
+def test_create_reports_empty_key(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(_editor, "edit_toml", lambda initial, validate: 'base_url = "https://h"\n')
+    monkeypatch.setattr(profile, "_prompt_key", lambda: "")
+    profile.create("home")
+    out = capsys.readouterr().out
+    assert "no api_key set" in out
+    assert "unifictl credential set default" in out
+    assert credential_store.get_api_key("default") is None
+
+
 def test_create_aborts_when_editor_returns_none(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setattr(_editor, "edit_toml", lambda initial, validate: None)
@@ -117,6 +128,34 @@ def test_set_rejects_unknown_key(monkeypatch, tmp_path) -> None:
     _profile(tmp_path, "home", 'base_url = "https://h"\n')
     with pytest.raises(ConfigError, match="unknown key"):
         profile.set_("home", "nope", "x")
+
+
+def test_set_coerces_insecure_tls_to_bool(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    profile.set_("home", "insecure_tls", "true")
+    assert profile_store.read_profile("home")["insecure_tls"] is True
+
+
+def test_set_coerces_timeout_ms_to_int(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    profile.set_("home", "timeout_ms", "5000")
+    assert profile_store.read_profile("home")["timeout_ms"] == 5000
+
+
+def test_set_rejects_invalid_insecure_tls(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    with pytest.raises(ConfigError, match="insecure_tls must be a boolean"):
+        profile.set_("home", "insecure_tls", "maybe")
+
+
+def test_set_rejects_invalid_timeout_ms(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    with pytest.raises(ConfigError, match="timeout_ms must be an integer"):
+        profile.set_("home", "timeout_ms", "abc")
 
 
 def test_activate_writes_default(monkeypatch, tmp_path) -> None:

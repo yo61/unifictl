@@ -109,6 +109,10 @@ def create(name: str, /) -> None:
         key = _prompt_key()
         if key:
             credential_store.set_credential(credential, key)
+        else:
+            _console.print(
+                f"no api_key set; run: unifictl credential set {credential}", markup=False
+            )
 
 
 @app.command(name="edit")
@@ -127,12 +131,30 @@ def edit(name: str, /) -> None:
     profile_store.write_profile_doc(name, tomlkit.parse(text))
 
 
+def _coerce_profile_value(key: str, value: str) -> object:
+    """Coerce a `profile set` string value to the profile key's TOML type."""
+    if key == "insecure_tls":
+        low = value.strip().lower()
+        if low in {"true", "1", "yes", "on"}:
+            return True
+        if low in {"false", "0", "no", "off"}:
+            return False
+        raise ConfigError(f"insecure_tls must be a boolean, got {value!r}")
+    if key == "timeout_ms":
+        try:
+            return int(value)
+        except ValueError as exc:
+            raise ConfigError(f"timeout_ms must be an integer, got {value!r}") from exc
+    return value
+
+
 @app.command(name="set")
 def set_(name: str, key: str, value: str, /) -> None:
     """Set a non-secret field on a profile (comments preserved).
 
     Raises:
-        ConfigError: unknown profile, ``key == 'api_key'``, or an unknown key.
+        ConfigError: unknown profile, ``key == 'api_key'``, an unknown key, or a
+            value that cannot be coerced to the key's type.
     """
     _require_profile(name)
     if key == "api_key":
@@ -141,7 +163,7 @@ def set_(name: str, key: str, value: str, /) -> None:
         allowed = ", ".join(sorted(profile_store.PROFILE_KEYS))
         raise ConfigError(f"unknown key {key!r}; allowed: {allowed}")
     doc = profile_store.read_profile_doc(name)
-    doc[key] = value
+    doc[key] = _coerce_profile_value(key, value)
     profile_store.write_profile_doc(name, doc)
 
 

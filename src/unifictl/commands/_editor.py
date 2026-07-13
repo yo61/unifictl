@@ -32,7 +32,7 @@ def edit_toml(initial: str, validate: Callable[[str], None]) -> str | None:
 
     Returns:
         The validated text, or ``None`` if the user left an invalid buffer
-        unchanged (abort).
+        unchanged, or the editor exited non-zero (abort).
 
     Raises:
         ConfigError: if no editor is configured.
@@ -43,7 +43,10 @@ def edit_toml(initial: str, validate: Callable[[str], None]) -> str | None:
         path.write_text(initial, encoding="utf-8")
         previous = initial
         while True:
-            subprocess.run([*command, str(path)], check=True)
+            try:
+                subprocess.run([*command, str(path)], check=True)
+            except subprocess.CalledProcessError:
+                return None  # non-zero editor exit (e.g. vim :cq) → abort
             text = path.read_text(encoding="utf-8")
             try:
                 validate(text)
