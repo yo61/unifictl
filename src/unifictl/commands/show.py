@@ -35,7 +35,9 @@ def port(
     settings = load_settings()
     switch_mac = switch or settings.switch
     if not switch_mac:
-        raise ConfigError("no switch specified; pass --switch or set 'switch' in a profile")
+        raise ConfigError(
+            "no switch specified; pass --switch or set 'switch' in the active profile"
+        )
     client = UnifiClient(settings)
     try:
         description = describe_switch_port(client, switch_mac, port_idx)
