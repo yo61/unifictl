@@ -74,6 +74,19 @@ _PORT_IDX_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
     }
 )
 
+# cmd_path -> primary long-form flag names, in signature order. `()` is global.
+# Guarded against drift by tests/test_completion_tree_drift.py.
+_FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
+    (): ("--profile",),
+    ("set", "lag"): ("--switch", "--leader", "--dry-run", "--yes"),
+    ("show", "port"): ("--switch", "--json"),
+    ("list", "devices"): ("--json",),
+    ("completion", "install"): ("--shell", "--dest"),
+    ("profile", "delete"): ("--yes",),
+    ("credential", "set"): ("--stdin",),
+    ("credential", "delete"): ("--yes",),
+}
+
 
 def _completion_devices() -> list[dict[str, object]]:
     """Fetch raw devices for completion, or ``[]`` on any problem.
@@ -205,6 +218,12 @@ def run(shell: str, /, *words: str) -> None:
     word_list = list(words)
     completed = word_list[1:-1] if len(word_list) > 1 else []
     cmd_path, leftover = _walk_static(completed)
+    partial = word_list[-1] if len(word_list) > 1 else ""
+    if partial.startswith("-"):
+        for flag in _FLAG_NAMES.get(cmd_path, ()):
+            print(flag)
+        return
+
     in_positionals = leftover
 
     if in_positionals:

@@ -191,3 +191,25 @@ def test_port_completion_survives_malformed_config(run, monkeypatch) -> None:
     monkeypatch.setattr(_complete, "load_settings", _raise)
     # Goes through _resolve_switch -> load_settings; must not raise.
     assert run("unifictl", "show", "port", "") == []
+
+
+def test_set_lag_flag_names(run) -> None:
+    assert run("unifictl", "set", "lag", "-") == [
+        "--switch",
+        "--leader",
+        "--dry-run",
+        "--yes",
+    ]
+
+
+def test_list_devices_flag_names(run) -> None:
+    assert run("unifictl", "list", "devices", "-") == ["--json"]
+
+
+def test_global_profile_flag_name(run) -> None:
+    assert run("unifictl", "-") == ["--profile"]
+
+
+def test_command_without_flags_yields_no_flag_names(run) -> None:
+    # `set` is a group with no flags of its own.
+    assert run("unifictl", "set", "-") == []
