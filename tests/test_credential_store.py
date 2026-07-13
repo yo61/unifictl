@@ -56,3 +56,10 @@ def test_list_and_delete(monkeypatch, tmp_path) -> None:
 def test_get_missing_credential_returns_none(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert credential_store.get_api_key("nope") is None
+
+
+def test_set_leaves_no_leftover_temp_file(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    credential_store.set_credential("default", "sekret")
+    leftovers = list(credential_store.credentials_path().parent.glob(".credentials-*.tmp"))
+    assert leftovers == []

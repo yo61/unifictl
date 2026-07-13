@@ -6,7 +6,9 @@ unifictl file that stores secrets, and the only one required to be ``0600``.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -22,16 +24,23 @@ def credentials_path() -> Path:
 
 
 def _write_0600(path: Path, text: str) -> None:
-    """Write text to path, ensuring the file is 0600 from creation (no window).
+    """Atomically write text to path with 0600 permissions.
 
-    ``os.open`` with an explicit mode applies ``0600`` atomically when the file is
-    created (umask does not widen 0600). The trailing ``chmod`` tightens the case
-    where the file pre-existed with looser permissions.
+    Writes to a temp file in the same directory (created 0600 by mkstemp) and
+    ``os.replace``s it into place, so a crash mid-write never truncates or
+    corrupts the destination and the file is never briefly world-readable.
     """
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(text)
-    path.chmod(0o600)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".credentials-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
 
 
 def read_credentials() -> dict[str, dict[str, object]]:
