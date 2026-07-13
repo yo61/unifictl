@@ -496,17 +496,27 @@ def test_apply_profile_none_leaves_env(monkeypatch) -> None:
     assert os.environ["UNIFI_PROFILE"] == "keep"
 
 
-def test_profile_flag_selects_before_dispatch(monkeypatch) -> None:
+def test_profile_flag_selects_before_dispatch(
+    monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # NB: do NOT use `--help`/`--version` here — cyclopts intercepts those before
+    # the meta launcher runs, so they bypass _apply_profile. Use a real, no-network
+    # command (`completion zsh` just prints a script) so the launcher actually runs.
     monkeypatch.delenv("UNIFI_PROFILE", raising=False)
     with pytest.raises(SystemExit):
-        get_app().meta(["--profile", "lab", "--help"])
+        get_app().meta(["--profile", "lab", "completion", "zsh"])
     assert os.environ["UNIFI_PROFILE"] == "lab"
+    capsys.readouterr()  # swallow the emitted completion script
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/test_cli.py -k "profile" -v`
 Expected: FAIL with `cannot import name '_apply_profile'`.
+
+Note: `--profile X --help` does NOT set the profile (cyclopts short-circuits help
+before the launcher). That is fine — with `--help` the user wants help, not a
+target. Real invocations (`--profile X <command>`) run the launcher and set it.
 
 - [ ] **Step 3: Implement**
 
