@@ -40,6 +40,12 @@ def list_() -> None:
         _console.print(f"{name}{marker}", markup=False)
 
 
+def _require_profile(name: str) -> None:
+    if not profile_store.profile_exists(name):
+        available = ", ".join(profile_store.list_profile_names()) or "(none)"
+        raise ConfigError(f"unknown profile {name!r}; available: {available}")
+
+
 @app.command(name="describe")
 def describe(name: str, /) -> None:
     """Show a profile's fields plus its (redacted) api_key.
@@ -47,9 +53,7 @@ def describe(name: str, /) -> None:
     Raises:
         ConfigError: if ``name`` is not a defined profile.
     """
-    if not profile_store.profile_exists(name):
-        available = ", ".join(profile_store.list_profile_names()) or "(none)"
-        raise ConfigError(f"unknown profile {name!r}; available: {available}")
+    _require_profile(name)
     profile = profile_store.read_profile(name)
     for key in _DESCRIBE_ORDER:
         if key in profile:
@@ -114,12 +118,71 @@ def edit(name: str, /) -> None:
     Raises:
         ConfigError: if ``name`` is not a defined profile.
     """
-    if not profile_store.profile_exists(name):
-        available = ", ".join(profile_store.list_profile_names()) or "(none)"
-        raise ConfigError(f"unknown profile {name!r}; available: {available}")
+    _require_profile(name)
     initial = profile_store.profile_path(name).read_text(encoding="utf-8")
     text = _editor.edit_toml(initial, validate=_validate_profile_text)
     if text is None:
         _console.print("aborted")
         return
     profile_store.write_profile_doc(name, tomlkit.parse(text))
+
+
+@app.command(name="set")
+def set_(name: str, key: str, value: str, /) -> None:
+    """Set a non-secret field on a profile (comments preserved).
+
+    Raises:
+        ConfigError: unknown profile, ``key == 'api_key'``, or an unknown key.
+    """
+    _require_profile(name)
+    if key == "api_key":
+        raise ConfigError("api_key is not a profile field; run: unifictl credential set")
+    if key not in profile_store.PROFILE_KEYS:
+        allowed = ", ".join(sorted(profile_store.PROFILE_KEYS))
+        raise ConfigError(f"unknown key {key!r}; allowed: {allowed}")
+    doc = profile_store.read_profile_doc(name)
+    doc[key] = value
+    profile_store.write_profile_doc(name, doc)
+
+
+@app.command(name="unset")
+def unset(name: str, key: str, /) -> None:
+    """Remove a field from a profile.
+
+    Raises:
+        ConfigError: if ``name`` is not a defined profile.
+    """
+    _require_profile(name)
+    doc = profile_store.read_profile_doc(name)
+    if key in doc:
+        del doc[key]
+        profile_store.write_profile_doc(name, doc)
+
+
+@app.command(name="activate")
+def activate(name: str, /) -> None:
+    """Make ``name`` the default profile (writes config.toml).
+
+    Raises:
+        ConfigError: if ``name`` is not a defined profile.
+    """
+    _require_profile(name)
+    profile_store.set_default_profile(name)
+    _console.print(f"default profile is now {name!r}", markup=False)
+
+
+@app.command(name="delete")
+def delete(name: str, /, *, yes: bool = False) -> None:
+    """Delete a profile file (credentials are left untouched).
+
+    Args:
+        name: The profile to remove.
+        yes: Skip the confirmation prompt.
+    """
+    if not yes and not questionary.confirm(f"Delete profile {name!r}?", default=False).ask():
+        _console.print("aborted")
+        return
+    if profile_store.delete_profile(name):
+        _console.print(f"profile {name!r} deleted", markup=False)
+    else:
+        _console.print(f"no such profile {name!r}", markup=False)

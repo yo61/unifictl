@@ -93,3 +93,47 @@ def test_edit_validates_and_writes(monkeypatch, tmp_path) -> None:
     )
     profile.edit("home")
     assert profile_store.read_profile("home")["base_url"] == "https://new"
+
+
+def test_set_and_unset_preserve_comments(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", '# note\nbase_url = "https://h"\n')
+    profile.set_("home", "switch", "aa:bb")
+    text = profile_store.profile_path("home").read_text()
+    assert "# note" in text and 'switch = "aa:bb"' in text
+    profile.unset("home", "switch")
+    assert "switch" not in profile_store.read_profile("home")
+
+
+def test_set_rejects_api_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    with pytest.raises(ConfigError, match="credential set"):
+        profile.set_("home", "api_key", "leak")
+
+
+def test_set_rejects_unknown_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    with pytest.raises(ConfigError, match="unknown key"):
+        profile.set_("home", "nope", "x")
+
+
+def test_activate_writes_default(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    profile.activate("home")
+    assert profile_store.default_profile_name() == "home"
+
+
+def test_activate_unknown_raises(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    with pytest.raises(ConfigError, match="unknown profile 'ghost'"):
+        profile.activate("ghost")
+
+
+def test_delete_with_yes(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _profile(tmp_path, "home", 'base_url = "https://h"\n')
+    profile.delete("home", yes=True)
+    assert not profile_store.profile_exists("home")
