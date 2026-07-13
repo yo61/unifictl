@@ -49,7 +49,7 @@ def lag(
     settings = load_settings()
     switch_mac = switch or settings.switch
     if not switch_mac:
-        raise ConfigError("no switch specified; pass --switch or set 'switch' in config")
+        raise ConfigError("no switch specified; pass --switch or set 'switch' in a profile")
     leader_ports = list(leader) if leader else list(settings.leaders)
     if not leader_ports:
         raise ConfigError("no LAG leader ports; pass --leader or set 'leaders' in config")
