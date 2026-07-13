@@ -4,8 +4,8 @@ Connection and secrets (``base_url``, ``api_key``, ``site``, TLS settings) come
 from ``UNIFI_*`` environment variables or the selected profile in
 ``~/.config/unifictl/config.toml``; env vars win. The profile is selected via
 ``UNIFI_PROFILE`` (which the ``--profile`` flag sets) or the TOML
-``default_profile``. If a profile carries an inline ``api_key``, the file must be
-``chmod 600`` — a group/world-readable file is refused.
+``default_profile``. If any profile carries an inline ``api_key``, the file must
+be ``chmod 600`` — a group/world-readable file is refused.
 
 Operational ``switch`` resolves from the selected profile or the top-level TOML;
 ``leaders`` comes from the top-level TOML only. CLI flags override both in the

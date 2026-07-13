@@ -51,8 +51,9 @@ candidates rather than blocking your shell.
 
 ## Configuration
 
-Connection and secrets come from the environment (never committed), matching
-`unifi-mcp`:
+Connection and secrets come from the environment or a selected profile (see
+Profiles below); env vars are never committed and take precedence over profile
+values. Matching `unifi-mcp`:
 
 | Variable | Purpose |
 | --- | --- |
@@ -92,9 +93,9 @@ environment variable, or `default_profile`. Each field resolves
 a `--leader` flag with the top-level `leaders` default, because LAG membership
 changes over time.
 
-Because a profile stores an API key, `config.toml` must be `chmod 600` when it
-holds one; `unifictl` refuses a group/world-readable file in that case. Scaffold a
-block with:
+When any profile in the file stores an inline `api_key`, `config.toml` must be
+`chmod 600`; `unifictl` refuses a group/world-readable file in that case.
+Scaffold a block with:
 
 ```sh
 unifictl profile example home >> ~/.config/unifictl/config.toml && chmod 600 ~/.config/unifictl/config.toml
