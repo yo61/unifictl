@@ -4,8 +4,32 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
+from typing import Protocol
 
 import pytest
+
+
+class WriteProfile(Protocol):
+    """Callable that writes a profile TOML file under a test's XDG config home."""
+
+    def __call__(self, name: str, body: str) -> None: ...
+
+
+@pytest.fixture
+def write_profile(tmp_path: Path) -> WriteProfile:
+    """Return a helper that writes ``<XDG_CONFIG_HOME>/unifictl/profiles/<name>.toml``.
+
+    Assumes the test has already set ``XDG_CONFIG_HOME`` to ``tmp_path`` via
+    ``monkeypatch.setenv``.
+    """
+
+    def _write(name: str, body: str) -> None:
+        d = tmp_path / "unifictl" / "profiles"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{name}.toml").write_text(body, encoding="utf-8")
+
+    return _write
 
 
 @pytest.fixture(autouse=True)
