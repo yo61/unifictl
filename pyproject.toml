@@ -11,7 +11,7 @@ dependencies = [
     "httpx>=0.28",
     "questionary>=2.0",
     "rich>=13",
-    "tomli-w>=1.0",
+    "tomlkit>=0.13",
     "xdg-base-dirs>=6",
 ]
 

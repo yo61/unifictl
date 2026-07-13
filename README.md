@@ -51,8 +51,9 @@ candidates rather than blocking your shell.
 
 ## Configuration
 
-Connection and secrets come from the environment (never committed), matching
-`unifi-mcp`:
+Connection and secrets come from the environment or a selected profile (see
+Profiles & credentials below); env vars are never committed and take precedence
+over profile values. Matching `unifi-mcp`:
 
 | Variable | Purpose |
 | --- | --- |
@@ -63,8 +64,45 @@ Connection and secrets come from the environment (never committed), matching
 | `UNIFI_INSECURE_TLS` | Last-resort TLS bypass |
 | `UNIFI_TIMEOUT_MS` | Per-request timeout (default `30000`) |
 
-Operational parameters (switch MAC and LAG leader ports) live in an
-XDG TOML file at `~/.config/unifictl/config.toml`; CLI flags override them.
+LAG leader ports live in an XDG TOML file at `~/.config/unifictl/config.toml`
+(`leaders = [1, 2]`); CLI flags override them. The switch MAC is a profile field
+(see below), not a `config.toml` setting.
+
+### Profiles & credentials
+
+Point `unifictl` at different targets with named profiles. Non-secret config lives
+one-file-per-profile under `~/.config/unifictl/profiles/`; the API key lives in a
+separate `~/.config/unifictl/credentials.toml` (`0600`, the only secret file):
+
+```toml
+# ~/.config/unifictl/profiles/home.toml   (safe to share)
+base_url = "https://192.168.1.1"
+switch   = "aa:bb:cc:dd:ee:ff"
+# credential = "default"      # which credentials.toml section holds the key
+```
+
+```toml
+# ~/.config/unifictl/credentials.toml      (chmod 600)
+[default]
+api_key = "…"
+```
+
+A profile's `credential` defaults to `default`, so one controller/key backs many
+per-switch profiles with no duplication. Select a profile with `--profile NAME`,
+`UNIFI_PROFILE`, or `profile activate NAME` (writes `default_profile`). Fields
+resolve `CLI > env > profile > built-in`; the api_key resolves
+`UNIFI_API_KEY > credentials[credential] > error`.
+
+```sh
+unifictl profile create home        # opens $VISUAL or $EDITOR for the non-secret
+                                     # fields, then prompts (hidden) for the API key
+unifictl profile list
+unifictl profile describe home       # fields + redacted key
+unifictl profile set home switch aa:bb:cc:dd:ee:ff
+unifictl profile activate home
+unifictl credential set default      # rotate the shared key, once
+unifictl credential list
+```
 
 ## Development
 
