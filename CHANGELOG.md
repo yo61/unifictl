@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0](https://github.com/yo61/unifictl/compare/v0.4.0...v0.5.0) (2026-07-14)
+
+
+### Features
+
+* complete profile/credential names, keys, and option flags ([57fa2d4](https://github.com/yo61/unifictl/commit/57fa2d4b06c309f4bc4b57a7f7a47e4173524085))
+* **completion:** complete option flag names ([0c12d7a](https://github.com/yo61/unifictl/commit/0c12d7a24b7f51bb934a4131630564de234cd701))
+* **completion:** complete profile and credential names ([8dc5aac](https://github.com/yo61/unifictl/commit/8dc5aacdc67c309e0087240d08fe9354c5f024e4))
+* **completion:** complete profile keys for set and unset ([63f152f](https://github.com/yo61/unifictl/commit/63f152f0744f364beed266825614e2a9c19d3aaa))
+
+
+### Bug Fixes
+
+* **completion:** handle --profile before subcommand; guard name tables ([ab67d68](https://github.com/yo61/unifictl/commit/ab67d687675862a9b7ee834cfa00f75fe42196d9))
+
+
+### Documentation
+
+* design for completion of names and option flags ([49346c8](https://github.com/yo61/unifictl/commit/49346c8874a29c908ecc6d0723cbc1a78ed15fb1))
+* implementation plan for completion names and flags ([b4e3bc0](https://github.com/yo61/unifictl/commit/b4e3bc0558a6e3b1a83a3ffcdd9b46a800162591))
+* record completion static-tree + drift-guard decision ([9455771](https://github.com/yo61/unifictl/commit/9455771eb5e64fc38a45a4566151e69d90c4eb99))
+
 ## [0.4.0](https://github.com/yo61/unifictl/compare/v0.3.1...v0.4.0) (2026-07-13)
 
 
