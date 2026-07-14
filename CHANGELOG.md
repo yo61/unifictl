@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/yo61/unifictl/compare/v0.5.0...v0.5.1) (2026-07-14)
+
+
+### Documentation
+
+* record DNS-to-Terraform and tap unsigned-commits decisions ([5994ec7](https://github.com/yo61/unifictl/commit/5994ec70aa7f5d9a386241eccc46d58ff16f36c6))
+* record DNS-to-Terraform and tap unsigned-commits decisions ([7987e1e](https://github.com/yo61/unifictl/commit/7987e1e798a1f2bc3c65d096c1077b2bb500dd65))
+
 ## [0.5.0](https://github.com/yo61/unifictl/compare/v0.4.0...v0.5.0) (2026-07-14)
 
 
