@@ -145,6 +145,16 @@ def _profile_names() -> list[str]:
         return []
 
 
+def _profile_existing_keys(name: str) -> list[str]:
+    """Keys present in profile ``name``'s document, or ``[]`` on any problem."""
+    try:
+        from unifictl.infrastructure import profile_store
+
+        return list(profile_store.read_profile(name).keys())
+    except Exception:
+        return []
+
+
 def _credential_names() -> list[str]:
     """Defined credential names, or ``[]`` on any problem (TAB must never fail)."""
     try:
@@ -245,6 +255,28 @@ def _positional_index(tokens: list[str]) -> int:
     return count
 
 
+def _nth_positional(tokens: list[str], index: int) -> str | None:
+    """Return the value of positional-``index`` in ``tokens``, or ``None``.
+
+    Flags and the values consumed by value-taking flags are skipped, matching
+    :func:`_positional_index`'s accounting.
+    """
+    count = 0
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            if token in _VALUE_FLAGS:
+                skip_next = True
+            continue
+        if count == index:
+            return token
+        count += 1
+    return None
+
+
 def run(shell: str, /, *words: str) -> None:
     """Print completion candidates for the tokens typed so far.
 
@@ -308,6 +340,20 @@ def run(shell: str, /, *words: str) -> None:
         if cmd_path in _CREDENTIAL_NAME_COMMANDS:
             for name in _credential_names():
                 print(name)
+            return
+
+    if _positional_index(in_positionals) == 1:
+        if cmd_path == ("profile", "set"):
+            from unifictl.infrastructure.profile_store import PROFILE_KEYS
+
+            for key in sorted(PROFILE_KEYS):
+                print(key)
+            return
+        if cmd_path == ("profile", "unset"):
+            name = _nth_positional(in_positionals, 0)
+            if name:
+                for key in _profile_existing_keys(name):
+                    print(key)
             return
 
     port_position = _PORT_IDX_AT_POSITION.get(cmd_path)
