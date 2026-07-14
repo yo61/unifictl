@@ -65,3 +65,32 @@ def test_flag_names_match() -> None:
 def test_global_profile_flag_present() -> None:
     assert _primary_flags(get_app().meta) == ("--profile",)
     assert "--profile" in _complete._FLAG_NAMES[()]
+
+
+def _leaves_taking_leading_name(app, group: str) -> set:
+    """Leaf commands under `group` whose first positional parameter is `name`."""
+    result = set()
+    for leaf in _command_names(app[group]):
+        func = app[group][leaf].default_command
+        params = list(inspect.signature(func).parameters.values())
+        if (
+            params
+            and params[0].name == "name"
+            and params[0].kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        ):
+            result.add((group, leaf))
+    return result
+
+
+def test_profile_name_commands_match() -> None:
+    app = get_app()
+    # `create` takes a NEW name, so it is intentionally excluded from completion.
+    expected = _leaves_taking_leading_name(app, "profile") - {("profile", "create")}
+    assert set(_complete._PROFILE_NAME_COMMANDS) == expected
+
+
+def test_credential_name_commands_match() -> None:
+    assert set(_complete._CREDENTIAL_NAME_COMMANDS) == _leaves_taking_leading_name(
+        get_app(), "credential"
+    )

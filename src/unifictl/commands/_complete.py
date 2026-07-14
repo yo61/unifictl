@@ -217,6 +217,21 @@ def _walk_static(words: list[str]) -> tuple[tuple[str, ...], list[str]]:
     return (words[0],), list(words[1:])
 
 
+def _strip_leading_global_flags(completed: list[str]) -> list[str]:
+    """Drop a leading global ``--profile <value>`` pair before the command walk.
+
+    ``--profile`` is the meta launcher's flag and may precede the subcommand
+    (``unifictl --profile home set lag``). Left in place it would derail
+    :func:`_walk_static`, which expects a command as the first token. A lone
+    trailing ``--profile`` whose value is being completed is left untouched, so
+    the value-completion branch can still offer profile names.
+    """
+    tokens = list(completed)
+    while len(tokens) >= 2 and tokens[0] == "--profile":
+        tokens = tokens[2:]
+    return tokens
+
+
 def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
     """Return the visible command names at the given tree depth."""
     if len(cmd_path) == 0:
@@ -292,6 +307,7 @@ def run(shell: str, /, *words: str) -> None:
 
     word_list = list(words)
     completed = word_list[1:-1] if len(word_list) > 1 else []
+    completed = _strip_leading_global_flags(completed)
     cmd_path, leftover = _walk_static(completed)
     partial = word_list[-1] if len(word_list) > 1 else ""
     if partial.startswith("-"):
