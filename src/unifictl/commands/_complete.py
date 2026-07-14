@@ -74,6 +74,40 @@ _PORT_IDX_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
     }
 )
 
+# Commands whose positional 0 is an existing profile name (`create` is excluded:
+# it takes a NEW name).
+_PROFILE_NAME_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
+    {
+        ("profile", "describe"),
+        ("profile", "edit"),
+        ("profile", "set"),
+        ("profile", "unset"),
+        ("profile", "activate"),
+        ("profile", "delete"),
+    }
+)
+
+# Commands whose positional 0 is an existing credential name.
+_CREDENTIAL_NAME_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
+    {("credential", "set"), ("credential", "delete")}
+)
+
+# (cmd_path, flag) pairs whose value is a profile name (the global --profile).
+_PROFILE_NAME_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset({((), "--profile")})
+
+# cmd_path -> primary long-form flag names, in signature order. `()` is global.
+# Guarded against drift by tests/test_completion_tree_drift.py.
+_FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
+    (): ("--profile",),
+    ("set", "lag"): ("--switch", "--leader", "--dry-run", "--yes"),
+    ("show", "port"): ("--switch", "--json"),
+    ("list", "devices"): ("--json",),
+    ("completion", "install"): ("--shell", "--dest"),
+    ("profile", "delete"): ("--yes",),
+    ("credential", "set"): ("--stdin",),
+    ("credential", "delete"): ("--yes",),
+}
+
 
 def _completion_devices() -> list[dict[str, object]]:
     """Fetch raw devices for completion, or ``[]`` on any problem.
@@ -99,6 +133,36 @@ def _completion_devices() -> list[dict[str, object]]:
         if client is not None:
             with contextlib.suppress(Exception):
                 client.close()
+
+
+def _profile_names() -> list[str]:
+    """Defined profile names, or ``[]`` on any problem (TAB must never fail)."""
+    try:
+        from unifictl.infrastructure import profile_store
+
+        return profile_store.list_profile_names()
+    except Exception:
+        return []
+
+
+def _profile_existing_keys(name: str) -> list[str]:
+    """Keys present in profile ``name``'s document, or ``[]`` on any problem."""
+    try:
+        from unifictl.infrastructure import profile_store
+
+        return list(profile_store.read_profile(name).keys())
+    except Exception:
+        return []
+
+
+def _credential_names() -> list[str]:
+    """Defined credential names, or ``[]`` on any problem (TAB must never fail)."""
+    try:
+        from unifictl.infrastructure import credential_store
+
+        return credential_store.list_credential_names()
+    except Exception:
+        return []
 
 
 def _switch_macs() -> list[str]:
@@ -153,6 +217,21 @@ def _walk_static(words: list[str]) -> tuple[tuple[str, ...], list[str]]:
     return (words[0],), list(words[1:])
 
 
+def _strip_leading_global_flags(completed: list[str]) -> list[str]:
+    """Drop a leading global ``--profile <value>`` pair before the command walk.
+
+    ``--profile`` is the meta launcher's flag and may precede the subcommand
+    (``unifictl --profile home set lag``). Left in place it would derail
+    :func:`_walk_static`, which expects a command as the first token. A lone
+    trailing ``--profile`` whose value is being completed is left untouched, so
+    the value-completion branch can still offer profile names.
+    """
+    tokens = list(completed)
+    while len(tokens) >= 2 and tokens[0] == "--profile":
+        tokens = tokens[2:]
+    return tokens
+
+
 def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
     """Return the visible command names at the given tree depth."""
     if len(cmd_path) == 0:
@@ -166,7 +245,9 @@ def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
 # a positional. Used to locate positional slots when flags are interleaved.
 # Invariant: no flag name is value-taking in one command and boolean in
 # another, so a flat set (not keyed by command) suffices to skip flag values.
-_VALUE_FLAGS: frozenset[str] = frozenset({"--switch", "--leader", "--shell", "--dest", "-d"})
+_VALUE_FLAGS: frozenset[str] = frozenset(
+    {"--switch", "--leader", "--shell", "--dest", "-d", "--profile"}
+)
 
 
 def _positional_index(tokens: list[str]) -> int:
@@ -189,6 +270,28 @@ def _positional_index(tokens: list[str]) -> int:
     return count
 
 
+def _nth_positional(tokens: list[str], index: int) -> str | None:
+    """Return the value of positional-``index`` in ``tokens``, or ``None``.
+
+    Flags and the values consumed by value-taking flags are skipped, matching
+    :func:`_positional_index`'s accounting.
+    """
+    count = 0
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            if token in _VALUE_FLAGS:
+                skip_next = True
+            continue
+        if count == index:
+            return token
+        count += 1
+    return None
+
+
 def run(shell: str, /, *words: str) -> None:
     """Print completion candidates for the tokens typed so far.
 
@@ -204,7 +307,14 @@ def run(shell: str, /, *words: str) -> None:
 
     word_list = list(words)
     completed = word_list[1:-1] if len(word_list) > 1 else []
+    completed = _strip_leading_global_flags(completed)
     cmd_path, leftover = _walk_static(completed)
+    partial = word_list[-1] if len(word_list) > 1 else ""
+    if partial.startswith("-"):
+        for flag in _FLAG_NAMES.get(cmd_path, ()):
+            print(flag)
+        return
+
     in_positionals = leftover
 
     if in_positionals:
@@ -228,11 +338,39 @@ def run(shell: str, /, *words: str) -> None:
                     for port in _port_indices(switch_mac):
                         print(port)
                 return
+            if (cmd_path, prev) in _PROFILE_NAME_FLAGS:
+                for name in _profile_names():
+                    print(name)
+                return
 
     if _positional_index(in_positionals) == 0 and cmd_path in _POSITIONAL_FIXED_VALUES:
         for value in _POSITIONAL_FIXED_VALUES[cmd_path]:
             print(value)
         return
+
+    if _positional_index(in_positionals) == 0:
+        if cmd_path in _PROFILE_NAME_COMMANDS:
+            for name in _profile_names():
+                print(name)
+            return
+        if cmd_path in _CREDENTIAL_NAME_COMMANDS:
+            for name in _credential_names():
+                print(name)
+            return
+
+    if _positional_index(in_positionals) == 1:
+        if cmd_path == ("profile", "set"):
+            from unifictl.infrastructure.profile_store import PROFILE_KEYS
+
+            for key in sorted(PROFILE_KEYS):
+                print(key)
+            return
+        if cmd_path == ("profile", "unset"):
+            name = _nth_positional(in_positionals, 0)
+            if name:
+                for key in _profile_existing_keys(name):
+                    print(key)
+            return
 
     port_position = _PORT_IDX_AT_POSITION.get(cmd_path)
     if port_position is not None and _positional_index(in_positionals) == port_position:

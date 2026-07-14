@@ -14,14 +14,22 @@ def _base_env(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
 
-def test_missing_base_url_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def _isolate_config(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    """Point config resolution at an empty dir so real ~/.config can't leak in."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("UNIFI_PROFILE", raising=False)
+
+
+def test_missing_base_url_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    _isolate_config(monkeypatch, tmp_path)
     monkeypatch.delenv("UNIFI_BASE_URL", raising=False)
     monkeypatch.setenv("UNIFI_API_KEY", "k")
     with pytest.raises(ConfigError, match="UNIFI_BASE_URL"):
         load_settings()
 
 
-def test_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    _isolate_config(monkeypatch, tmp_path)
     monkeypatch.setenv("UNIFI_BASE_URL", "https://gw")
     monkeypatch.delenv("UNIFI_API_KEY", raising=False)
     with pytest.raises(ConfigError, match="UNIFI_API_KEY"):
