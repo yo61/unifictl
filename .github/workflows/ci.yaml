@@ -24,7 +24,7 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
-      - uses: go-task/setup-task@3be4020d41929789a01026e0e427a4321ce0ad44  # v2.0.0
+      - uses: go-task/setup-task@01a4adf9db2d14c1de7a560f09170b6e0df736aa  # v2.1.0
         with:
           version: 3.x
       - run: uv sync
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
-      - uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa  # v0.5.7
+      - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054  # v0.6.2
         with:
           advanced-security: false
           persona: regular
