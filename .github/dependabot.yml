@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      hooks:
+        patterns: ["*"]
+
+  # Python dependencies. The uv ecosystem updates uv.lock as well as the
+  # pyproject.toml constraints; pip would leave the lock stale.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      uv-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions. Pins are SHAs with version comments; Dependabot
+  # rewrites both. Majors stay outside the group so they arrive singly.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
