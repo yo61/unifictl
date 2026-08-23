@@ -21,7 +21,7 @@ jobs:
       # lets `pull_request` workflow events fire on them. Without this, the
       # Release PR has no CI checks and branch protection blocks the merge.
       - id: create_token
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         with:
           client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
@@ -50,7 +50,7 @@ jobs:
       contents: read
     steps:
       - id: create_token
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         with:
           client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
@@ -150,7 +150,7 @@ jobs:
           python-version: "3.11"
           enable-cache: false
       - run: uv build
-      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
 
   # Tell the yo61/homebrew-tap repo to bump its unifictl formula to the
   # version we just published to PyPI. The tap's `bump-unifictl` workflow
@@ -168,7 +168,7 @@ jobs:
     permissions: {}
     steps:
       - id: create_token
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         with:
           client-id: ${{ secrets.SEMANTIC_RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
