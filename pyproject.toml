@@ -7,7 +7,7 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
-    "cyclopts==4.22.5",
+    "cyclopts==4.23.0",
     "httpx>=0.28",
     "questionary>=2.0",
     "rich>=13",
