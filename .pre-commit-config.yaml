@@ -58,7 +58,7 @@ repos:
       - id: commitlint
         stages: [commit-msg]
         additional_dependencies:
-          - "@commitlint/config-conventional@^21.2.0"
+          - "@commitlint/config-conventional@^21.2.2"
 
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.12
