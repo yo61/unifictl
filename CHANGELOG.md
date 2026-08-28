@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.2](https://github.com/yo61/unifictl/compare/v0.5.1...v0.5.2) (2026-08-28)
+
+
+### Dependencies
+
+* bump @commitlint/config-conventional in the hooks group ([#30](https://github.com/yo61/unifictl/issues/30)) ([a5a24b4](https://github.com/yo61/unifictl/commit/a5a24b49a09cd2c663b4a99c3a4a6de19a0e2282))
+* bump astral-sh/setup-uv from 9.0.0 to 10.0.1 ([#32](https://github.com/yo61/unifictl/issues/32)) ([bc6aee8](https://github.com/yo61/unifictl/commit/bc6aee8ddb4b112ac58b0f08e70348f3d3dfce08))
+* bump go-task/setup-task in the actions-minor-patch group ([#31](https://github.com/yo61/unifictl/issues/31)) ([985fd90](https://github.com/yo61/unifictl/commit/985fd90957ad70c77d1841dd012a6c0358579159))
+* bump the actions-minor-patch group across 1 directory with 4 updates ([#24](https://github.com/yo61/unifictl/issues/24)) ([24021fe](https://github.com/yo61/unifictl/commit/24021fead04b0bce438278068677cf1271d5eb60))
+* bump the hooks group across 1 directory with 2 updates ([#23](https://github.com/yo61/unifictl/issues/23)) ([c03980d](https://github.com/yo61/unifictl/commit/c03980d20f0b0b5fae6f0878c3a6878cdd9c5476))
+* bump the uv-minor-patch group across 1 directory with 5 updates ([#27](https://github.com/yo61/unifictl/issues/27)) ([79c7dbe](https://github.com/yo61/unifictl/commit/79c7dbef9e17a9e5930c41e763adce8e464d342b))
+* bump the uv-minor-patch group with 4 updates ([#33](https://github.com/yo61/unifictl/issues/33)) ([3c1a323](https://github.com/yo61/unifictl/commit/3c1a323469ab512fea1d0ccbc72beead53bd244c))
+
 ## [0.5.1](https://github.com/yo61/unifictl/compare/v0.5.0...v0.5.1) (2026-07-14)
 
 
