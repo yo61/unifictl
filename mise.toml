@@ -1,7 +1,13 @@
 [tools]
-uv = "0.11"
+uv = "0.12"
 task = "3"
 node = "22"
 
 [env]
+# Stop ad-hoc `uv run`/`uv sync` from rewriting uv.lock as a side effect. This
+# was previously set only in Taskfile.yaml, which covers `task`-invoked
+# commands and nothing else -- so the bare `uv sync` in README.md relocked
+# silently. Now that CI runs `uv sync --locked`, that drift is a hard failure.
+# `task uv:lock` is the deliberate way to change the lockfile.
+UV_FROZEN = "1"
 _.python.venv = ".venv"

@@ -107,7 +107,7 @@ unifictl credential list
 ## Development
 
 ```sh
-uv sync                 # create the venv and install deps
+uv sync                 # create the venv and install deps (task uv:lock to re-lock)
 task dev:check          # lint, format-check, typecheck, import boundaries, tests
 task dev:hooks-install  # install git hooks (prek)
 ```
