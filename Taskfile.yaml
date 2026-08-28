@@ -49,6 +49,24 @@ tasks:
       - task: dev:imports
       - task: dev:test
 
+  # Two separate traps, both of which produce a silent no-op rather than an
+  # error, so neither is visible without deliberately testing for it:
+  #
+  #   1. A task-level `env:` block does not win. Task will not override a
+  #      variable already present in the OS environment, which is where mise
+  #      puts UV_FROZEN. Hence `env -u`.
+  #   2. `env -u` alone is not enough either. If `uv` on PATH is a mise *shim*
+  #      rather than the real binary, the shim re-derives [env] from mise.toml
+  #      inside the child process and puts UV_FROZEN back after `env -u` has
+  #      stripped it. `mise which` resolves past the shim to the real binary;
+  #      `command -v` covers the case where uv is not mise-managed at all.
+  uv:lock:
+    desc: >-
+      Re-lock uv.lock. The only command that should change it; UV_FROZEN is "1"
+      elsewhere so nothing rewrites the lockfile as a side effect.
+    cmds:
+      - env -u UV_FROZEN "$(mise which uv 2>/dev/null || command -v uv)" lock
+
   dev:hooks:
     desc: Run all prek hooks against every file
     cmds:

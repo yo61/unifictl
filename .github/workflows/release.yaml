@@ -4,6 +4,19 @@ on:
   push:
     branches: [main]
 
+# Serialise release runs. Two rapid pushes to main otherwise race: the second
+# force-updates the release PR branch while the first is mid-flight, and the
+# first's createCommitOnBranch fails its expectedHeadOid. Queue rather than
+# cancel -- cancelling a run part-way through publishing is worse than waiting.
+concurrency:
+  # Deliberately not keyed on github.ref. This workflow only ever acts on the
+  # default branch -- release-please's target-branch defaults to it regardless
+  # of the ref the run started from -- so a ref-keyed group would put a run
+  # started from anywhere else into a separate group and let it race the very
+  # thing this block serialises.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions: {}
 
 jobs:
@@ -14,7 +27,6 @@ jobs:
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name:        ${{ steps.rp.outputs.tag_name }}
-      prs:             ${{ steps.rp.outputs.prs }}
     steps:
       # Mint a short-lived App token so PRs opened by release-please look like
       # the semantic-release-pusher App rather than github-actions[bot], which
@@ -44,10 +56,8 @@ jobs:
   # the release PR branch and push the result back.
   sync-lockfile:
     needs: release-please
-    if: needs.release-please.outputs.prs && needs.release-please.outputs.prs != '[]'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    permissions: {}
     steps:
       - id: create_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
@@ -57,51 +67,157 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
+          permission-pull-requests: read
+      # Resolve the Release PR from the open PR list, not from release-please's
+      # `prs` output. That output is set only when release-please actually
+      # updated a PR, and it declines to update when the regenerated body is
+      # unchanged (manifest.ts, maybeUpdateExistingPullRequest). A sync missed
+      # once -- a transient failure, or this job not existing yet -- would then
+      # never be retried until the next releasable commit arrived. "Is there an
+      # open Release PR?" is the precondition this job actually cares about.
+      #
+      # Three details, each of which was a bug before it was a comment:
+      #
+      #   1. `gh pr list --label` is NOT used. It resolves through `query
+      #      PullRequestSearch` -- the search API -- which is index-lagged and
+      #      can miss a PR release-please created seconds earlier in the
+      #      previous job. The unfiltered list hits repository.pullRequests
+      #      and is read-your-writes.
+      #   2. --limit 201. The default is 30, ordered CREATED_AT DESC. The
+      #      Release PR is long-lived, so it is the OLDEST open PR and sorts
+      #      last -- on a busy repo it drops off page one and the job exits
+      #      green having synced nothing.
+      #   3. The selector checks author and branch prefix, not just the label.
+      #      A label is mutable by anyone with write access, and the next step
+      #      runs `uv lock`, which executes build backends from the tree it
+      #      checked out.
       - id: pr_branch
         env:
-          PRS_JSON: ${{ needs.release-please.outputs.prs }}
+          GH_TOKEN: ${{ steps.create_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          branch=$(printf '%s' "$PRS_JSON" | jq -r '.[0].headBranchName')
-          if [[ -z "$branch" || "$branch" == "null" ]]; then
-            echo "release-please did not report a head branch; skipping" >&2
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          gh pr list --state open --limit 201 \
+            --json headRefName,labels,author,isCrossRepository > /tmp/prs.json
+          # Every guard below reads this file, so an empty or truncated fetch
+          # would make all of them agree there is nothing to do -- the exact
+          # silent-green outcome this job exists to prevent. Check the file
+          # itself before trusting anything derived from it.
+          if [[ ! -s /tmp/prs.json ]]; then
+            echo "::error::gh pr list produced no output"
+            exit 1
           fi
-      - if: steps.pr_branch.outputs.skip != 'true'
+          # 201 requested, so >200 is unambiguously truncation rather than a
+          # repo that happens to have exactly the limit open. The Release PR is
+          # the oldest open PR, so it is precisely the one that falls off.
+          if [[ "$(jq length /tmp/prs.json)" -gt 200 ]]; then
+            echo "::error::open PR list was truncated; raise the limit -- the Release PR may not be in this page"
+            exit 1
+          fi
+          # Matched on is_bot plus a substring, not an exact login. GitHub
+          # renders this one identity three ways and it is easy to "fix" this
+          # comparison into a silent no-match:
+          #   gh pr list --json author  -> app/semantic-release-pusher
+          #   REST pulls/{n} user.login -> semantic-release-pusher[bot]
+          #   GraphQL Bot.login         -> semantic-release-pusher
+          # Only the first is what this step reads. The substring match holds
+          # for all three, so gh changing its normalisation cannot silently
+          # break the lookup.
+          filter='map(select(
+            .author.is_bot == true and
+            (.author.login | contains("semantic-release-pusher")) and
+            .isCrossRepository == false and
+            (.headRefName | startswith("release-please--branches--")) and
+            ((.labels // []) | any(.name == "autorelease: pending"))))'
+          count=$(jq "$filter | length" /tmp/prs.json)
+          if [[ "$count" -gt 1 ]]; then
+            jq -r "$filter | .[].headRefName" /tmp/prs.json
+            echo "::error::$count Release PRs matched; refusing to guess"
+            exit 1
+          fi
+          branch=$(jq -r "$filter | .[0].headRefName // empty" /tmp/prs.json)
+          if [[ -z "$branch" ]]; then
+            # An open PR on a release branch that the selector did not match
+            # means the selector is wrong, not that there is nothing to do.
+            # Exiting green there is the failure this whole job exists to
+            # avoid, so make it loud and print what was actually seen.
+            # Scoped to same-repo PRs: a fork cannot create a branch here, so
+            # a drive-by fork PR named release-please--branches--* must not be
+            # able to fail every release run.
+            if jq -e 'any(.isCrossRepository == false and (.headRefName |
+                startswith("release-please--branches--")))' /tmp/prs.json > /dev/null; then
+              jq -r '.[] | select(.isCrossRepository == false and (.headRefName |
+                startswith("release-please--branches--"))) |
+                "\(.headRefName) author=\(.author.login) bot=\(.author.is_bot) labels=\([.labels[]?.name] | join(","))"' /tmp/prs.json
+              echo "::error::a release-branch PR is open but the selector did not match it; check the autorelease label and release-please's label config, then re-run this workflow"
+              exit 1
+            fi
+            echo "no open Release PR; nothing to sync"
+          else
+            echo "Release PR branch: $branch"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - if: steps.pr_branch.outputs.branch != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ steps.pr_branch.outputs.branch }}
           token: ${{ steps.create_token.outputs.token }}
-          persist-credentials: true
-      - if: steps.pr_branch.outputs.skip != 'true'
+          # Nothing here pushes over git -- the commit goes through the GraphQL
+          # API below -- so the App token has no reason to persist in .git/config.
+          persist-credentials: false
+      - if: steps.pr_branch.outputs.branch != ''
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
         with:
           python-version: "3.11"
           enable-cache: false
-      - if: steps.pr_branch.outputs.skip != 'true'
-        name: Sync uv.lock and commit (signed) if changed
+      # Deliberately holds no token. `uv lock` runs build backends out of the
+      # checked-out pyproject.toml, on a branch selected partly by a mutable
+      # label; keeping the App token out of this step means that code never
+      # sees it. Only the next step, which touches no project code, gets it.
+      - if: steps.pr_branch.outputs.branch != ''
+        id: relock
+        name: Re-lock uv.lock
+        run: |
+          set -euo pipefail
+          # Unset rather than set to "0". UV_FROZEN=1 turns `uv lock` into a
+          # no-op that exits 0 AND degrades `uv lock --check` to a warning that
+          # also exits 0 -- so an assertion made while trusting the variable is
+          # disabled by exactly the condition it exists to detect. Unsetting
+          # makes both the lock and the assertion independent of the ambient
+          # environment, which is the only way the guard means anything.
+          unset UV_FROZEN
+          uv lock
+          uv lock --check
+          if [[ -z "$(git status --porcelain uv.lock)" ]]; then
+            echo "uv.lock already in sync"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base64 -w0 < uv.lock > /tmp/uv.lock.b64
+          {
+            echo "changed=true"
+            echo "head_sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+      - if: steps.relock.outputs.changed == 'true'
+        name: Commit the lockfile, signed, through the API
         env:
-          UV_FROZEN: "0"
           GH_TOKEN: ${{ steps.create_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           BRANCH: ${{ steps.pr_branch.outputs.branch }}
-        # Use the GraphQL createCommitOnBranch mutation rather than
-        # `git commit`/`git push`. Commits created via the GitHub API on
-        # an App's behalf are signed by GitHub's app-flow key, which the
-        # `required_signatures` ruleset on `main` requires. A plain
-        # `git commit` from the runner produces an unsigned commit
-        # because no GPG key is provisioned, which blocks the release PR.
+          HEAD_SHA: ${{ steps.relock.outputs.head_sha }}
+        # Uses the GraphQL createCommitOnBranch mutation, not git commit/push.
+        # Commits made via the API on an App's behalf are signed by GitHub's
+        # app-flow key, which the required_signatures ruleset on main demands;
+        # a plain git commit from the runner is unsigned and blocks the PR.
         run: |
           set -euo pipefail
-          uv lock
-          if [[ -z "$(git status --porcelain uv.lock)" ]]; then
-            echo "uv.lock already in sync"
-            exit 0
-          fi
-          head_sha=$(git rev-parse HEAD)
-          base64 -w0 < uv.lock > /tmp/uv.lock.b64
+          # Request built with jq --rawfile and submitted via --input. Two
+          # failure modes this avoids:
+          #   1. Inline `-f content=$b64` exceeds MAX_ARG_STRLEN (128KB per
+          #      arg) once uv.lock passes ~95KB (E2BIG / exit 126).
+          #   2. `-f content=@/tmp/file` does NOT work -- gh's @filename
+          #      expansion does not apply to graphql variables; it sends the
+          #      literal path and the server rejects "Invalid Base64".
           # shellcheck disable=SC2016 # jq references, not shell expansions.
           query='mutation($repo: String!, $branch: String!, $sha: GitObjectID!, $content: Base64String!) {
             createCommitOnBranch(input: {
@@ -117,7 +233,7 @@ jobs:
             --arg query "$query" \
             --arg repo "$GITHUB_REPOSITORY" \
             --arg branch "$BRANCH" \
-            --arg sha "$head_sha" \
+            --arg sha "$HEAD_SHA" \
             --rawfile content /tmp/uv.lock.b64 \
             '{
               query: $query,
