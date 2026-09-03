@@ -178,16 +178,27 @@ through `tail` masked a non-zero exit. 2026-09-03 — `dev:check` exited 201 at
 ## Criteria:
 
     - Conventional Commits, imperative mood, subject <= 72 chars; commitlint
-      passes.
-    - One logical change per commit. A bug fix and a feature ship as separate
-      commits so release-please files each under the right changelog heading.
+      passes for **every** commit in the PR, not just the tip.
+    - The repo rebase-merges, so each commit lands on `main` and becomes a
+      changelog line release-please parses from its **subject**. Every commit
+      must therefore stand alone as release notes; a fix and a feature in one
+      PR give both a `Bug Fixes` and a `Features` entry with the right bump.
+    - Fixups are squashed before merge (`git commit --fixup`, then
+      `git rebase -i --autosquash`). The `commit-hygiene` CI job rejects
+      `fixup!`/`squash!`/`amend!`/`wip` subjects; it cannot judge whether a
+      well-formed commit is worth publishing, so that check stays manual.
+    - Curating toward fewer, larger commits is a changelog concern, not only a
+      review one — six commits for one feature means six release-note lines.
     - Never commit directly to `main`; never push to `main`.
     - Commit bodies describe what the code does now, in plain language — no
       "critical", "robust", "comprehensive"; no discarded alternatives.
 
 ## Severity: warning
 
-## Source: global standards; release-please-config.json. 2026-09-03 — the
-gateway IP fix and the `--wan` flag were split so both reach the changelog.
+## Source: global standards; release-please-config.json;
+decisions/2026-09-03-rebase-only-merge-policy.md. 2026-09-03 — the gateway fix
+and `--wan` were split into two commits, then squash-merged, so 0.5.4 recorded
+the feature under `Bug Fixes` with a patch bump. The repo moved to rebase-only
+merges in response.
 
 ## Last triggered: 2026-09-03
