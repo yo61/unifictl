@@ -86,13 +86,18 @@ fixture in the suite was a `usw`, so nothing exercised a device where `ip` and
 
 ---
 
-## Category: Secrets and privacy in the repo
+## Category: Secrets and privacy in published artefacts
 
 ## Criteria:
 
-    - Test fixtures and documentation use reserved documentation ranges
-      (RFC 5737 `203.0.113.0/24`, `192.0.2.0/24`) — never a real public IP,
-      API key, or externally-resolvable hostname captured from live probing.
+    - Reserved documentation ranges (RFC 5737 `203.0.113.0/24`,
+      `192.0.2.0/24`) are used in **every artefact that leaves the machine** —
+      fixtures, docs, commit messages, PR and issue bodies, review comments —
+      never a real public IP, key, or internal hostname taken from live
+      probing. Redacting afterwards does not undo it: GitHub keeps body and
+      comment edit history, readable by anyone who can see the thread.
+    - Scope is checked per artefact, not once per change. Sanitising the diff
+      says nothing about the PR description written from the same probe output.
     - `credentials.toml` is written `0600` atomically, and reads reject a
       group/world-readable file.
     - Profile files never hold secrets; only the credential store does.
@@ -102,10 +107,13 @@ fixture in the suite was a `usw`, so nothing exercised a device where `ip` and
 
 ## Source: decisions/2026-07-13-separate-credential-store.md;
 decisions/2026-07-12-config-profiles-inline-secrets.md. 2026-09-03 — a live
-probe surfaced the real WAN address, substituted with `203.0.113.7` before it
-reached a fixture.
+probe surfaced the real WAN address; it was substituted with `203.0.113.7` in
+the fixtures and decision note, then pasted verbatim into the PR #39 body on a
+public repo. Widened from "fixtures and documentation" to every outbound
+artefact after that miss, since the internal-only hostname meant the PR body
+was the first public disclosure of the address.
 
-## Last triggered: 2026-09-03
+## Last triggered: 2026-09-03 (twice)
 
 ---
 
