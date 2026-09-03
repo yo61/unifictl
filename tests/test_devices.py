@@ -27,3 +27,22 @@ def test_missing_fields_become_empty_strings() -> None:
     assert summary.mac == "aa:bb"
     assert summary.name == ""
     assert summary.ip == ""
+
+
+def test_gateway_lan_ip_wins_over_the_wan_address_in_ip() -> None:
+    """A gateway reports its WAN address in ``ip`` and its LAN address in ``lan_ip``."""
+    raw = {
+        "name": "gw",
+        "model": "UDMPRO",
+        "type": "udm",
+        "mac": "d0:21:f9:d0:24:59",
+        "ip": "203.0.113.7",
+        "lan_ip": "192.168.1.1",
+    }
+    assert device_summary(raw).ip == "192.168.1.1"
+
+
+def test_ip_is_used_when_no_lan_ip_is_reported() -> None:
+    """Switches and APs report only ``ip``, which is already the LAN address."""
+    raw = {"name": "SW", "model": "USL24P", "type": "usw", "mac": "aa", "ip": "192.168.1.170"}
+    assert device_summary(raw).ip == "192.168.1.170"
