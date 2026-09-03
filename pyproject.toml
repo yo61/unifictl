@@ -22,6 +22,7 @@ unifictl = "unifictl.cli:main"
 dev = [
     "hypothesis>=6",
     "import-linter>=2",
+    "pexpect>=4",
     "pytest>=8",
     "pytest-cov>=5",
     "pytest-httpx>=0.30",
@@ -73,6 +74,11 @@ addopts = "-ra --strict-markers"
 # this from a forgotten `app([])` and warns; the warning is a false positive.
 filterwarnings = [
     "ignore:Cyclopts application invoked without tokens.*:UserWarning",
+    # test_completion_bash_integration.py drives a real bash through pexpect,
+    # which forks a pty. Python 3.12+ warns because pytest's process has
+    # threads; the fork here is immediately followed by tty setup and execv in
+    # the child, which is the only mode pexpect offers. Nothing to fix.
+    "ignore:This process .* is multi-threaded, use of forkpty.*:DeprecationWarning",
 ]
 
 [tool.importlinter]
