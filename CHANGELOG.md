@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3](https://github.com/yo61/unifictl/compare/v0.5.2...v0.5.3) (2026-09-03)
+
+
+### Bug Fixes
+
+* **completion:** read flag values in every spelling cyclopts accepts ([#36](https://github.com/yo61/unifictl/issues/36)) ([98d802d](https://github.com/yo61/unifictl/commit/98d802dcac0ce67ebac714d220493c7e9cbe13aa))
+* **completion:** use bash's repaired words so partial MACs complete ([#38](https://github.com/yo61/unifictl/issues/38)) ([6eab026](https://github.com/yo61/unifictl/commit/6eab026f0ddb823544cb82c4713df7d1eca8314a))
+
 ## [0.5.2](https://github.com/yo61/unifictl/compare/v0.5.1...v0.5.2) (2026-08-28)
 
 
