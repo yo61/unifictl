@@ -62,6 +62,45 @@ jobs:
         with:
           configFile: commitlint.config.mjs
 
+  # This repo rebase-merges, so every commit in a PR lands on main and becomes
+  # release-note material release-please parses. Fixups must be squashed before
+  # merge; `git commit --fixup` leaves the markers and `git rebase -i
+  # --autosquash` collapses them. commitlint above validates each subject's
+  # form -- this checks the commit *set* is curated.
+  commit-hygiene:
+    name: Commit hygiene
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject fixup, squash, and WIP commits
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          log=$(git log --format='%h%x09%s' "$BASE_SHA..$HEAD_SHA")
+          uncurated=0
+          while IFS=$'\t' read -r sha subject; do
+            [ -n "$sha" ] || continue
+            if printf '%s' "$subject" \
+              | grep -qiE '^(fixup|squash|amend)!|^wip([[:space:]:!]|$)'; then
+              echo "::error::uncurated commit: $sha $subject"
+              uncurated=1
+            fi
+          done <<< "$log"
+          if [ "$uncurated" -ne 0 ]; then
+            echo "Squash the commits above before merge: git rebase -i --autosquash"
+            exit 1
+          fi
+          echo "commit set is curated"
+
   zizmor:
     name: zizmor
     runs-on: ubuntu-latest
