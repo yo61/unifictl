@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/yo61/unifictl/compare/v0.5.3...v0.5.4) (2026-09-03)
+
+
+### Bug Fixes
+
+* **list:** report LAN addresses, and add --wan for gateway public IPs ([#39](https://github.com/yo61/unifictl/issues/39)) ([967cc09](https://github.com/yo61/unifictl/commit/967cc09d6c6cb1667c06ad9302cb7928cb968142))
+
 ## [0.5.3](https://github.com/yo61/unifictl/compare/v0.5.2...v0.5.3) (2026-09-03)
 
 
