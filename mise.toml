@@ -2,6 +2,10 @@
 uv = "0.12"
 task = "3"
 node = "22"
+# The bundled bash completion script is linted by pre-commit; provision the
+# linters here so the hooks find them without a separate manual install.
+shellcheck = "0.11"
+shfmt = "3.14"
 
 [env]
 # Stop ad-hoc `uv run`/`uv sync` from rewriting uv.lock as a side effect. This

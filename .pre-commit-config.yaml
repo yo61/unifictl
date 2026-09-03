@@ -52,6 +52,24 @@ repos:
         types: [python]
         pass_filenames: false
 
+  # Only unifictl.bash is checked; the .zsh and .fish scripts are excluded.
+  # shellcheck and shfmt cover sh/bash/mksh and neither claims zsh or fish.
+  # shellcheck reports SC2296 as an *error* on the valid `${(@f)...}` in
+  # unifictl.zsh, and shfmt has no zsh parser -- it happens to leave that
+  # file's expansions intact today but guarantees nothing for zsh syntax.
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck --shell=bash
+        language: system
+        files: \.bash$
+      - id: shfmt
+        name: shfmt
+        entry: shfmt -i 2 -bn -ci -sr -w
+        language: system
+        files: \.bash$
+
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
     rev: v9.26.0
     hooks:
