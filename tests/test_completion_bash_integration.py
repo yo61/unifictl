@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from unifictl.commands._complete import FILES_SENTINEL
+
 pexpect = pytest.importorskip("pexpect", reason="pexpect drives the interactive bash")
 
 _SCRIPT = Path(__file__).parent.parent / "src" / "unifictl" / "_completion" / "unifictl.bash"
@@ -87,8 +89,8 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture(scope="module")
-def rcfile(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A bashrc that puts the stub on PATH and sources the bundled script."""
+def bash_env(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """A bashrc that puts the stub on PATH, plus an inputrc pinning readline."""
     root = tmp_path_factory.mktemp("bashrc")
     bindir = root / "bin"
     bindir.mkdir()
@@ -105,17 +107,25 @@ def rcfile(tmp_path_factory: pytest.TempPathFactory) -> Path:
             """),
         encoding="utf-8",
     )
-    return rc
+    # Whether the first TAB lists candidates or merely rings the bell is
+    # readline configuration, not completion behaviour. Left to the machine
+    # these tests read the developer's ~/.inputrc -- which is exactly how they
+    # passed locally and failed in CI. INPUTRC beats both ~/.inputrc and
+    # /etc/inputrc, so the terminal behaves the same everywhere.
+    inputrc = root / "inputrc"
+    inputrc.write_text("set show-all-if-ambiguous on\nset bell-style none\n", encoding="utf-8")
+    return rc, inputrc
 
 
 @pytest.fixture
-def complete(rcfile: Path):
+def complete(bash_env: tuple[Path, Path]):
     """Type a line, press TAB, and return what bash put on the screen.
 
     A fresh bash per case: sharing one session desynchronises, because the
     marker used to detect "readline has finished" also appears in bash's echo
     of the command that prints it, so screens leak between cases.
     """
+    rcfile, inputrc = bash_env
 
     def _run(line: str) -> str:
         child = pexpect.spawn(
@@ -124,6 +134,7 @@ def complete(rcfile: Path):
             timeout=15,
             encoding="utf-8",
             dimensions=(40, 220),
+            env={**os.environ, "INPUTRC": str(inputrc)},
         )
         try:
             child.expect("@@ ")
@@ -155,17 +166,17 @@ def test_mac_candidates_offered_for_empty_value(complete) -> None:
 
 def test_partial_mac_still_offers_candidates(complete) -> None:
     # The regression: bash splits `70:a7` into `70 : a7`, so filtering against
-    # COMP_WORDS[COMP_CWORD] ('a7') discarded every candidate and rang the bell.
+    # COMP_WORDS[COMP_CWORD] ('a7') discarded every candidate, so nothing was
+    # offered at all.
+    # Both candidates display trimmed to the segment after the last colon, as
+    # bash does for any colon-bearing word.
     screen = complete("unifictl show port --switch 70:a7")
-    assert "\x07" not in screen, "bell: no candidates survived filtering"
-    # Displayed trimmed to the segment after the last colon, as bash does for
-    # any colon-bearing word.
     assert "a7:41:90:82:dd" in screen
+    assert "a7:41:90:82:ee" in screen
 
 
 def test_partial_mac_completes_to_the_full_value(complete) -> None:
     screen = complete("unifictl show port --switch 70:a7:41:90:82:d")
-    assert "\x07" not in screen
     assert "70:a7:41:90:82:dd" in screen
 
 
@@ -175,4 +186,10 @@ def test_fixed_flag_values_are_offered(complete) -> None:
 
 
 def test_files_sentinel_defers_to_native_path_completion(complete) -> None:
-    assert "/tmp/" in complete("unifictl completion install --dest /tm")
+    screen = complete("unifictl completion install --dest /tm")
+    # The sentinel is an instruction to the shell, never a candidate: seeing it
+    # on screen would mean the hand-off to native path completion never ran.
+    assert FILES_SENTINEL not in screen
+    # Whether bash appends a trailing slash is `mark-directories`; that the
+    # path got extended at all is the behaviour under test.
+    assert "/tmp" in screen
