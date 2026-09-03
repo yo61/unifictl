@@ -171,9 +171,7 @@ def read_credentials() -> dict[str, dict[str, object]]:
     if not path.exists():
         return {}
     if path.stat().st_mode & 0o077:
-        raise ConfigError(
-            f"{path} is group/world-readable; run: chmod 600 {path}"
-        )
+        raise ConfigError(f"{path} is group/world-readable; run: chmod 600 {path}")
     with path.open("rb") as fh:
         data = tomllib.load(fh)
     return {str(name): dict(table) for name, table in data.items() if isinstance(table, dict)}
@@ -311,7 +309,7 @@ def test_read_rejects_api_key(monkeypatch, tmp_path) -> None:
 
 def test_read_rejects_unknown_key(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_profile(tmp_path, "home", 'nope = 1\n')
+    _write_profile(tmp_path, "home", "nope = 1\n")
     with pytest.raises(ConfigError, match="home.*nope"):
         profile_store.read_profile("home")
 
@@ -648,7 +646,9 @@ def load_settings() -> Settings:
         site=os.environ.get("UNIFI_SITE") or _pstr(profile, "site", name) or "default",
         ca_cert=_optional_path(os.environ.get("UNIFI_CA_CERT") or _pstr(profile, "ca_cert", name)),
         insecure_tls=_resolve_bool("UNIFI_INSECURE_TLS", profile, "insecure_tls", name),
-        timeout_ms=_resolve_int("UNIFI_TIMEOUT_MS", profile, "timeout_ms", name, DEFAULT_TIMEOUT_MS),
+        timeout_ms=_resolve_int(
+            "UNIFI_TIMEOUT_MS", profile, "timeout_ms", name, DEFAULT_TIMEOUT_MS
+        ),
         switch=_pstr(profile, "switch", name),
         leaders=_toml_leaders(_load_toml(config_file_path())),
     )
@@ -723,7 +723,15 @@ from unifictl.infrastructure.config import ConfigError
 app = App(name="profile", help="Manage connection profiles.")
 _console = Console()
 
-_DESCRIBE_ORDER = ("base_url", "site", "switch", "credential", "ca_cert", "insecure_tls", "timeout_ms")
+_DESCRIBE_ORDER = (
+    "base_url",
+    "site",
+    "switch",
+    "credential",
+    "ca_cert",
+    "insecure_tls",
+    "timeout_ms",
+)
 
 
 @app.command(name="list")
@@ -875,9 +883,7 @@ def test_no_editor_configured_raises(monkeypatch) -> None:
 def test_returns_edited_text(monkeypatch, tmp_path) -> None:
     # editor appends a line, then the content validates
     _fake_editor(
-        'import sys\n'
-        'p = sys.argv[1]\n'
-        'open(p, "a").write(\'switch = "aa"\\n\')\n',
+        'import sys\np = sys.argv[1]\nopen(p, "a").write(\'switch = "aa"\\n\')\n',
         monkeypatch,
         tmp_path,
     )
@@ -1111,9 +1117,10 @@ def delete(name: str, /, *, yes: bool = False) -> None:
 In `src/unifictl/cli.py`, inside `get_app`, import and register alongside the others:
 
 ```python
-    from unifictl.commands.credential import app as credential_app
-    ...
-    app.command(credential_app)
+from unifictl.commands.credential import app as credential_app
+
+...
+app.command(credential_app)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -1187,7 +1194,9 @@ def test_create_aborts_when_editor_returns_none(monkeypatch, tmp_path, capsys) -
 def test_edit_validates_and_writes(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     _profile(tmp_path, "home", 'base_url = "https://old"\n')
-    monkeypatch.setattr(_editor, "edit_toml", lambda initial, validate: 'base_url = "https://new"\n')
+    monkeypatch.setattr(
+        _editor, "edit_toml", lambda initial, validate: 'base_url = "https://new"\n'
+    )
     profile.edit("home")
     assert profile_store.read_profile("home")["base_url"] == "https://new"
 ```
@@ -1363,7 +1372,9 @@ def set_(name: str, key: str, value: str, /) -> None:
     if key == "api_key":
         raise ConfigError("api_key is not a profile field; run: unifictl credential set")
     if key not in profile_store.PROFILE_KEYS:
-        raise ConfigError(f"unknown key {key!r}; allowed: {', '.join(sorted(profile_store.PROFILE_KEYS))}")
+        raise ConfigError(
+            f"unknown key {key!r}; allowed: {', '.join(sorted(profile_store.PROFILE_KEYS))}"
+        )
     doc = profile_store.read_profile_doc(name)
     doc[key] = value
     profile_store.write_profile_doc(name, doc)
@@ -1441,12 +1452,26 @@ In `tests/test_complete.py`, update the top-level set and the profile sub-comman
 
 ```python
 def test_top_level_commands() -> None:
-    assert set(run("unifictl", "")) == {"set", "list", "show", "completion", "profile", "credential"}
+    assert set(run("unifictl", "")) == {
+        "set",
+        "list",
+        "show",
+        "completion",
+        "profile",
+        "credential",
+    }
 
 
 def test_profile_subcommands() -> None:
     assert set(run("unifictl", "profile", "")) == {
-        "create", "edit", "set", "unset", "list", "describe", "activate", "delete",
+        "create",
+        "edit",
+        "set",
+        "unset",
+        "list",
+        "describe",
+        "activate",
+        "delete",
     }
 
 

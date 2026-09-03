@@ -328,3 +328,52 @@ def test_profile_value_before_flag_names(run) -> None:
         "--dry-run",
         "--yes",
     ]
+
+
+@pytest.mark.parametrize(
+    ("token", "expected"),
+    [
+        ("--switch=aa:bb", ("--switch", "aa:bb")),
+        ("--switch", ("--switch", None)),
+        ("--dry-run", ("--dry-run", None)),
+        ("-d/tmp/x", ("-d", "/tmp/x")),
+        ("-d=/tmp/x", ("-d", "/tmp/x")),
+        ("-d", ("-d", None)),
+        ("--switch=", ("--switch", "")),
+        ("on", ("on", None)),
+        ("-", ("-", None)),
+        ("--", ("--", None)),
+    ],
+)
+def test_split_flag_token(token: str, expected: tuple[str, str | None]) -> None:
+    assert _complete._split_flag_token(token) == expected
+
+
+def test_split_flag_token_leaves_unknown_short_flags_whole() -> None:
+    # -x is not a known value-taking flag, so `-xyz` is not a flag plus value.
+    assert _complete._split_flag_token("-xyz") == ("-xyz", None)
+
+
+def test_flag_value_reads_both_spellings() -> None:
+    assert _complete._flag_value(["--switch", "aa:bb"], "--switch") == "aa:bb"
+    assert _complete._flag_value(["--switch=aa:bb"], "--switch") == "aa:bb"
+    assert _complete._flag_value(["--json"], "--switch") is None
+    assert _complete._flag_value(["--switch"], "--switch") is None
+
+
+def test_positional_index_skips_attached_flag_values() -> None:
+    assert _complete._positional_index(["--switch=aa:bb"]) == 0
+    assert _complete._positional_index(["--switch=aa:bb", "5"]) == 1
+    assert _complete._positional_index(["-d/tmp"]) == 0
+
+
+def test_nth_positional_skips_attached_flag_values() -> None:
+    assert _complete._nth_positional(["--switch=aa:bb", "home"], 0) == "home"
+    assert _complete._nth_positional(["--switch=aa:bb", "home", "site"], 1) == "site"
+
+
+def test_strip_leading_global_flags_handles_attached_profile() -> None:
+    assert _complete._strip_leading_global_flags(["--profile=home", "set"]) == ["set"]
+    assert _complete._strip_leading_global_flags(["--profile", "home", "set"]) == ["set"]
+    # A lone trailing --profile is left in place so its value can be completed.
+    assert _complete._strip_leading_global_flags(["--profile"]) == ["--profile"]

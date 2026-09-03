@@ -53,7 +53,12 @@ from hypothesis import strategies as st
 from unifictl.domain.models import PortRole
 from unifictl.domain.ports import describe_port
 
-LEADER_17 = {"port_idx": 17, "op_mode": "aggregate", "aggregate_members": [17, 18], "name": "Port 17"}
+LEADER_17 = {
+    "port_idx": 17,
+    "op_mode": "aggregate",
+    "aggregate_members": [17, 18],
+    "name": "Port 17",
+}
 
 
 def test_leader_is_reported_as_leader() -> None:
@@ -416,7 +421,9 @@ from unifictl.domain.models import PortRole
 
 
 class FakeClient:
-    def __init__(self, devices: list[dict[str, Any]] | None = None, device: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, devices: list[dict[str, Any]] | None = None, device: dict[str, Any] | None = None
+    ) -> None:
         self._devices = devices or []
         self._device = device or {}
 
@@ -428,7 +435,9 @@ class FakeClient:
 
 
 def test_list_devices_maps_to_summaries() -> None:
-    client = FakeClient(devices=[{"name": "SW", "mac": "aa", "model": "M", "type": "usw", "ip": "1.2.3.4"}])
+    client = FakeClient(
+        devices=[{"name": "SW", "mac": "aa", "model": "M", "type": "usw", "ip": "1.2.3.4"}]
+    )
     summaries = list_devices(client)
     assert summaries[0].mac == "aa"
     assert summaries[0].name == "SW"
@@ -477,9 +486,7 @@ def list_devices(client: UnifiClient) -> list[DeviceSummary]:
     return [device_summary(raw) for raw in client.get_devices()]
 
 
-def describe_switch_port(
-    client: UnifiClient, switch_mac: str, port_idx: int
-) -> PortDescription:
+def describe_switch_port(client: UnifiClient, switch_mac: str, port_idx: int) -> PortDescription:
     """Return the aggregation role of ``port_idx`` on ``switch_mac``.
 
     Raises:
@@ -656,6 +663,7 @@ Add the import and registration alongside the existing `set` sub-app:
 
 ```python
 from unifictl.commands.list_ import app as list_app
+
 ...
 app.command(set_app)
 app.command(list_app)
@@ -848,9 +856,7 @@ def _render(description: PortDescription) -> None:
 
     if description.override:
         fields = ", ".join(
-            f"{key}={value!r}"
-            for key, value in description.override.items()
-            if key != "port_idx"
+            f"{key}={value!r}" for key, value in description.override.items() if key != "port_idx"
         )
         _console.print(f"  overrides: {fields}")
     else:
@@ -861,6 +867,7 @@ def _render(description: PortDescription) -> None:
 
 ```python
 from unifictl.commands.show import app as show_app
+
 ...
 app.command(show_app)
 ```
@@ -927,7 +934,10 @@ def test_list_devices_json(httpx_mock: HTTPXMock, capsys: pytest.CaptureFixture[
     httpx_mock.add_response(
         method="GET",
         url=DEVICES_URL,
-        json={"meta": {"rc": "ok"}, "data": [{"name": "SW", "mac": "aa", "model": "M", "type": "usw", "ip": "1.2.3.4"}]},
+        json={
+            "meta": {"rc": "ok"},
+            "data": [{"name": "SW", "mac": "aa", "model": "M", "type": "usw", "ip": "1.2.3.4"}],
+        },
     )
     _run("list", "devices", "--json")
     assert json.loads(capsys.readouterr().out)[0]["mac"] == "aa"
@@ -943,7 +953,9 @@ def test_show_port_member(httpx_mock: HTTPXMock, capsys: pytest.CaptureFixture[s
                 {
                     "_id": "dev1",
                     "port_table": [{"port_idx": 17}, {"port_idx": 18}],
-                    "port_overrides": [{"port_idx": 17, "op_mode": "aggregate", "aggregate_members": [17, 18]}],
+                    "port_overrides": [
+                        {"port_idx": 17, "op_mode": "aggregate", "aggregate_members": [17, 18]}
+                    ],
                 }
             ],
         },

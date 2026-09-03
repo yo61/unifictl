@@ -175,7 +175,7 @@ def test_profile_supplies_connection(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("UNIFI_PROFILE", "home")
     _write_config(
         tmp_path,
-        '[profiles.home]\n'
+        "[profiles.home]\n"
         'base_url = "https://home"\napi_key = "hk"\nsite = "s1"\nswitch = "aa:bb"\n',
     )
     settings = load_settings()
@@ -229,7 +229,7 @@ def test_missing_secret_names_profile(monkeypatch, tmp_path) -> None:
 def test_profile_switch_type_error_names_profile(monkeypatch, tmp_path) -> None:
     _base_env(monkeypatch, tmp_path)
     monkeypatch.setenv("UNIFI_PROFILE", "home")
-    _write_config(tmp_path, '[profiles.home]\nswitch = 42\n')
+    _write_config(tmp_path, "[profiles.home]\nswitch = 42\n")
     with pytest.raises(ConfigError, match="home.*switch.*string"):
         load_settings()
 ```
@@ -662,9 +662,10 @@ def list_() -> None:
 In `src/unifictl/cli.py`, inside `get_app`, import and register the sub-app alongside the others:
 
 ```python
-    from unifictl.commands.profile import app as profile_app
-    ...
-    app.command(profile_app)
+from unifictl.commands.profile import app as profile_app
+
+...
+app.command(profile_app)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -908,9 +909,7 @@ Expected: FAIL (sets lack `profile` / `profile` sub-commands unknown).
 In `src/unifictl/commands/_complete.py`:
 
 ```python
-_TOP_LEVEL_COMMANDS: frozenset[str] = frozenset(
-    {"set", "list", "show", "completion", "profile"}
-)
+_TOP_LEVEL_COMMANDS: frozenset[str] = frozenset({"set", "list", "show", "completion", "profile"})
 
 _SUB_APP_NAMES: dict[str, frozenset[str]] = {
     "set": frozenset({"lag"}),

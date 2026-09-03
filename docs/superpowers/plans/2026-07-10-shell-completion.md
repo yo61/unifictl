@@ -255,9 +255,7 @@ def test_completion_install_shell_values(run) -> None:
 
 
 def test_completion_install_dest_emits_files_sentinel(run) -> None:
-    assert run("unifictl", "completion", "install", "--dest", "") == [
-        _complete.FILES_SENTINEL
-    ]
+    assert run("unifictl", "completion", "install", "--dest", "") == [_complete.FILES_SENTINEL]
 
 
 def test_empty_words_is_noop(run) -> None:
@@ -418,9 +416,15 @@ git commit -m "feat: add static __complete candidate handler"
 from unifictl.infrastructure.config import Settings
 
 _DEVICES = [
-    {"type": "usw", "mac": "70:a7:41:90:82:dd", "port_table": [
-        {"port_idx": 1}, {"port_idx": 2}, {"port_idx": 17},
-    ]},
+    {
+        "type": "usw",
+        "mac": "70:a7:41:90:82:dd",
+        "port_table": [
+            {"port_idx": 1},
+            {"port_idx": 2},
+            {"port_idx": 17},
+        ],
+    },
     {"type": "ugw", "mac": "aa:bb:cc:dd:ee:ff", "port_table": [{"port_idx": 1}]},
 ]
 
@@ -968,6 +972,7 @@ git commit -m "feat: add completion command with install and self-heal"
 
 ```python
 # tests/test_cli.py  (append)
+
 
 def test_completion_zsh_registered(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
