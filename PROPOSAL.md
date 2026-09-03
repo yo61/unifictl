@@ -181,12 +181,13 @@ app = App(
 lag = App(name="lag", help="LACP aggregation control (PXE bootstrap helper).")
 app.command(lag)
 
+
 @lag.command
 def set(
     state: Literal["on", "off"],
     *,
-    switch: str,          # from config/env or --switch
-    ports: list[int],     # LAG leader ports, e.g. --ports 11 --ports 13
+    switch: str,  # from config/env or --switch
+    ports: list[int],  # LAG leader ports, e.g. --ports 11 --ports 13
     num_ports: int = 2,
     dry_run: bool = False,
 ):

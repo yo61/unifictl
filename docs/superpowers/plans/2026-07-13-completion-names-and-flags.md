@@ -86,12 +86,11 @@ _FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
 In `run()`, immediately after the `cmd_path, leftover = _walk_static(completed)` line and before `in_positionals = leftover`, insert:
 
 ```python
-    partial = word_list[-1] if len(word_list) > 1 else ""
-    if partial.startswith("-"):
-        for flag in _FLAG_NAMES.get(cmd_path, ()):
-            print(flag)
-        return
-
+partial = word_list[-1] if len(word_list) > 1 else ""
+if partial.startswith("-"):
+    for flag in _FLAG_NAMES.get(cmd_path, ()):
+        print(flag)
+    return
 ```
 
 This runs before all positional/value logic, so it takes precedence. It is safe because no value we complete (MAC, port index, name, key) begins with `-`.
@@ -236,9 +235,7 @@ _CREDENTIAL_NAME_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
 )
 
 # (cmd_path, flag) pairs whose value is a profile name (the global --profile).
-_PROFILE_NAME_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset(
-    {((), "--profile")}
-)
+_PROFILE_NAME_FLAGS: frozenset[tuple[tuple[str, ...], str]] = frozenset({((), "--profile")})
 ```
 
 - [ ] **Step 4: Teach `--profile` to the value-flag machinery**
@@ -316,9 +313,7 @@ def test_profile_set_completes_all_keys(run) -> None:
 
 
 def test_profile_unset_completes_existing_keys(run, monkeypatch) -> None:
-    monkeypatch.setattr(
-        _complete, "_profile_existing_keys", lambda name: ["switch", "site"]
-    )
+    monkeypatch.setattr(_complete, "_profile_existing_keys", lambda name: ["switch", "site"])
     assert run("unifictl", "profile", "unset", "home", "") == ["switch", "site"]
 
 
