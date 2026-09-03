@@ -10,10 +10,12 @@ from __future__ import annotations
 import inspect
 from typing import get_type_hints
 
+import pytest
 from cyclopts import App, Parameter
 
 from unifictl.cli import get_app
 from unifictl.commands import _complete
+from unifictl.infrastructure.config import Settings
 
 
 def _command_names(app: App) -> set[str]:
@@ -94,3 +96,105 @@ def test_credential_name_commands_match() -> None:
     assert set(_complete._CREDENTIAL_NAME_COMMANDS) == _leaves_taking_leading_name(
         get_app(), "credential"
     )
+
+
+# Every spelling cyclopts accepts for a value-taking flag. Only the first keeps
+# the value in a token of its own; the rest attach it to the flag token, which
+# the completion fast path has to unpack for itself.
+_VALUE_FLAG_SPELLINGS: tuple[tuple[str, ...], ...] = (
+    ("--switch", "70:a7:41:90:82:dd"),
+    ("--switch=70:a7:41:90:82:dd",),
+)
+
+_SHORT_FLAG_SPELLINGS: tuple[tuple[str, ...], ...] = (
+    ("-d", "/tmp/x"),
+    ("-d/tmp/x",),
+    ("-d=/tmp/x",),
+    ("--dest", "/tmp/x"),
+    ("--dest=/tmp/x",),
+)
+
+_DRIFT_DEVICES = [
+    {
+        "type": "usw",
+        "mac": "70:a7:41:90:82:dd",
+        "port_table": [{"port_idx": 1}, {"port_idx": 2}, {"port_idx": 17}],
+    },
+    {"type": "usw", "mac": "aa:bb:cc:dd:ee:ff", "port_table": [{"port_idx": 9}]},
+]
+
+
+@pytest.fixture
+def _drift_devices(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_complete, "_completion_devices", lambda: list(_DRIFT_DEVICES))
+    monkeypatch.setattr(
+        _complete,
+        "load_settings",
+        lambda: Settings(base_url="https://c", api_key="k", switch="aa:bb:cc:dd:ee:ff"),
+    )
+
+
+def _candidates(capsys: pytest.CaptureFixture[str], *words: str) -> list[str]:
+    _complete.run("zsh", *words)
+    return [line for line in capsys.readouterr().out.splitlines() if line]
+
+
+@pytest.mark.parametrize("spelling", _SHORT_FLAG_SPELLINGS, ids=lambda s: " ".join(s))
+def test_app_accepts_every_dest_spelling(spelling: tuple[str, ...]) -> None:
+    # Guards the matrix itself: a form listed here that the CLI rejects would
+    # make the completion tests below assert against an impossible command line.
+    _, bound, _ = get_app().parse_args(
+        ["completion", "install", *spelling], exit_on_error=False, verbose=False
+    )
+    assert bound.arguments["dest"] == "/tmp/x"
+
+
+@pytest.mark.parametrize("spelling", _VALUE_FLAG_SPELLINGS, ids=lambda s: " ".join(s))
+def test_app_accepts_every_switch_spelling(spelling: tuple[str, ...]) -> None:
+    _, bound, _ = get_app().parse_args(
+        ["show", "port", "3", *spelling], exit_on_error=False, verbose=False
+    )
+    assert bound.arguments["switch"] == "70:a7:41:90:82:dd"
+
+
+@pytest.mark.parametrize("spelling", _VALUE_FLAG_SPELLINGS, ids=lambda s: " ".join(s))
+def test_typed_switch_drives_port_completion_in_every_spelling(
+    spelling: tuple[str, ...], _drift_devices: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The config default switch is aa:bb:cc:dd:ee:ff, whose only port is 9. A
+    # spelling the fast path fails to read silently offers that switch's ports.
+    assert _candidates(capsys, "unifictl", "show", "port", *spelling, "") == ["1", "2", "17"]
+
+
+@pytest.mark.parametrize("spelling", _VALUE_FLAG_SPELLINGS, ids=lambda s: " ".join(s))
+def test_typed_switch_drives_leader_completion_in_every_spelling(
+    spelling: tuple[str, ...], _drift_devices: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _candidates(capsys, "unifictl", "set", "lag", "off", *spelling, "--leader", "")
+    assert out == ["1", "2", "17"]
+
+
+@pytest.mark.parametrize(
+    "spelling", (("--profile", "home"), ("--profile=home",)), ids=lambda s: " ".join(s)
+)
+def test_app_accepts_every_global_profile_spelling(spelling: tuple[str, ...]) -> None:
+    _, bound, _ = get_app().meta.parse_args(
+        [*spelling, "set", "lag", "on"], exit_on_error=False, verbose=False
+    )
+    assert bound.arguments["profile"] == "home"
+
+
+@pytest.mark.parametrize(
+    "spelling", (("--profile", "home"), ("--profile=home",)), ids=lambda s: " ".join(s)
+)
+def test_leading_global_profile_does_not_derail_the_walk(
+    spelling: tuple[str, ...], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _candidates(capsys, "unifictl", *spelling, "set", "lag", "") == ["on", "off"]
+
+
+@pytest.mark.parametrize("spelling", _SHORT_FLAG_SPELLINGS, ids=lambda s: " ".join(s))
+def test_attached_flag_values_are_not_counted_as_positionals(spelling: tuple[str, ...]) -> None:
+    # `completion install` takes no positionals, so every spelling must leave
+    # the positional cursor at 0.
+    assert _complete._positional_index(list(spelling)) == 0

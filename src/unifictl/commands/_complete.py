@@ -7,7 +7,7 @@ candidate per line; the shell scripts handle quoting and prefix filtering.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 from unifictl.infrastructure.client import UnifiClient
 from unifictl.infrastructure.config import load_settings
@@ -109,6 +109,78 @@ _FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
 }
 
 
+# Flags that consume the following token as their value, so that token is not
+# a positional. Used to locate positional slots when flags are interleaved.
+# Invariant: no flag name is value-taking in one command and boolean in
+# another, so a flat set (not keyed by command) suffices to skip flag values.
+_VALUE_FLAGS: frozenset[str] = frozenset(
+    {"--switch", "--leader", "--shell", "--dest", "-d", "--profile"}
+)
+
+
+def _split_flag_token(token: str) -> tuple[str, str | None]:
+    """Split a flag token into ``(flag, attached_value)``.
+
+    Cyclopts accepts four spellings for a value-taking flag: ``--switch MAC``,
+    ``--switch=MAC``, ``-d PATH`` and the attached short forms ``-dPATH`` and
+    ``-d=PATH``. Only the first keeps the value in a token of its own; the rest
+    carry it inside the flag token. Completion must unpack them or it will
+    mistake the value for a positional and miss the value the user typed.
+
+    Returns ``(token, None)`` for anything that is not a flag carrying a value.
+
+    Args:
+        token: A single command-line token.
+
+    Returns:
+        The flag name and its attached value, or ``(token, None)``.
+    """
+    if not token.startswith("-"):
+        return token, None
+    flag, separator, value = token.partition("=")
+    if separator:
+        return flag, value
+    if token.startswith("--"):
+        return token, None
+    short = token[:2]
+    if len(token) > 2 and short in _VALUE_FLAGS:
+        return short, token[2:]
+    return token, None
+
+
+def _iter_positionals(tokens: list[str]) -> Iterator[str]:
+    """Yield the true positional arguments in ``tokens``, in order.
+
+    Flags are dropped along with their values, whether the value sits in the
+    next token or is attached to the flag itself.
+    """
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            flag, attached = _split_flag_token(token)
+            skip_next = attached is None and flag in _VALUE_FLAGS
+            continue
+        yield token
+
+
+def _flag_value(tokens: list[str], flag: str) -> str | None:
+    """Return the value typed for ``flag``, in any spelling cyclopts accepts.
+
+    Cyclopts rejects a repeated flag, so the first occurrence is the only one.
+    """
+    for index, token in enumerate(tokens):
+        name, attached = _split_flag_token(token)
+        if name != flag:
+            continue
+        if attached is not None:
+            return attached
+        return tokens[index + 1] if index + 1 < len(tokens) else None
+    return None
+
+
 def _completion_devices() -> list[dict[str, object]]:
     """Fetch raw devices for completion, or ``[]`` on any problem.
 
@@ -178,9 +250,9 @@ def _switch_macs() -> list[str]:
 
 def _resolve_switch(tokens: list[str]) -> str | None:
     """The ``--switch`` value already typed in ``tokens``, else the config default."""
-    for index, token in enumerate(tokens):
-        if token == "--switch" and index + 1 < len(tokens):
-            return tokens[index + 1]
+    typed = _flag_value(tokens, "--switch")
+    if typed:
+        return typed
     try:
         return load_settings().switch
     except Exception:
@@ -218,17 +290,26 @@ def _walk_static(words: list[str]) -> tuple[tuple[str, ...], list[str]]:
 
 
 def _strip_leading_global_flags(completed: list[str]) -> list[str]:
-    """Drop a leading global ``--profile <value>`` pair before the command walk.
+    """Drop a leading global ``--profile`` and its value before the command walk.
 
     ``--profile`` is the meta launcher's flag and may precede the subcommand
     (``unifictl --profile home set lag``). Left in place it would derail
-    :func:`_walk_static`, which expects a command as the first token. A lone
-    trailing ``--profile`` whose value is being completed is left untouched, so
-    the value-completion branch can still offer profile names.
+    :func:`_walk_static`, which expects a command as the first token. The value
+    may be a separate token or attached (``--profile=home``); both are dropped.
+    A lone trailing ``--profile`` whose value is being completed is left
+    untouched, so the value-completion branch can still offer profile names.
     """
     tokens = list(completed)
-    while len(tokens) >= 2 and tokens[0] == "--profile":
-        tokens = tokens[2:]
+    while tokens:
+        flag, attached = _split_flag_token(tokens[0])
+        if flag != "--profile":
+            break
+        if attached is not None:
+            tokens = tokens[1:]
+        elif len(tokens) >= 2:
+            tokens = tokens[2:]
+        else:
+            break
     return tokens
 
 
@@ -241,54 +322,16 @@ def _visible_at(cmd_path: tuple[str, ...]) -> Iterable[str]:
     return frozenset()
 
 
-# Flags that consume the following token as their value, so that token is not
-# a positional. Used to locate positional slots when flags are interleaved.
-# Invariant: no flag name is value-taking in one command and boolean in
-# another, so a flat set (not keyed by command) suffices to skip flag values.
-_VALUE_FLAGS: frozenset[str] = frozenset(
-    {"--switch", "--leader", "--shell", "--dest", "-d", "--profile"}
-)
-
-
 def _positional_index(tokens: list[str]) -> int:
-    """Return the index of the next positional slot in ``tokens``.
-
-    Flags and the values consumed by value-taking flags are skipped, so the
-    result counts only true positional arguments already supplied.
-    """
-    count = 0
-    skip_next = False
-    for token in tokens:
-        if skip_next:
-            skip_next = False
-            continue
-        if token.startswith("-"):
-            if token in _VALUE_FLAGS:
-                skip_next = True
-            continue
-        count += 1
-    return count
+    """Return the index of the next positional slot in ``tokens``."""
+    return sum(1 for _ in _iter_positionals(tokens))
 
 
 def _nth_positional(tokens: list[str], index: int) -> str | None:
-    """Return the value of positional-``index`` in ``tokens``, or ``None``.
-
-    Flags and the values consumed by value-taking flags are skipped, matching
-    :func:`_positional_index`'s accounting.
-    """
-    count = 0
-    skip_next = False
-    for token in tokens:
-        if skip_next:
-            skip_next = False
-            continue
-        if token.startswith("-"):
-            if token in _VALUE_FLAGS:
-                skip_next = True
-            continue
+    """Return the value of positional-``index`` in ``tokens``, or ``None``."""
+    for count, value in enumerate(_iter_positionals(tokens)):
         if count == index:
-            return token
-        count += 1
+            return value
     return None
 
 
