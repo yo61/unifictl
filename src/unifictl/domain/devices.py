@@ -15,6 +15,10 @@ def device_summary(raw_device: dict[str, Any]) -> DeviceSummary:
     address in ``lan_ip``, which is absent on every non-gateway, so preferring
     it needs no device-type check.
 
+    ``wan_ip`` is the gateway's public address, empty for every device behind
+    it. Absence is reported as an empty string; rendering a placeholder for it
+    is the table's job, not this function's.
+
     Missing fields default to an empty string so the table always renders.
     """
     return DeviceSummary(
@@ -23,4 +27,5 @@ def device_summary(raw_device: dict[str, Any]) -> DeviceSummary:
         type=str(raw_device.get("type", "")),
         mac=str(raw_device.get("mac", "")),
         ip=str(raw_device.get("lan_ip") or raw_device.get("ip", "")),
+        wan_ip=str(raw_device.get("last_wan_ip", "")),
     )

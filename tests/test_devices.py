@@ -46,3 +46,21 @@ def test_ip_is_used_when_no_lan_ip_is_reported() -> None:
     """Switches and APs report only ``ip``, which is already the LAN address."""
     raw = {"name": "SW", "model": "USL24P", "type": "usw", "mac": "aa", "ip": "192.168.1.170"}
     assert device_summary(raw).ip == "192.168.1.170"
+
+
+def test_gateway_wan_address_is_kept_as_wan_ip() -> None:
+    """The gateway's public address stays available alongside its LAN address."""
+    raw = {
+        "type": "udm",
+        "ip": "203.0.113.7",
+        "lan_ip": "192.168.1.1",
+        "last_wan_ip": "203.0.113.7",
+    }
+    summary = device_summary(raw)
+    assert summary.ip == "192.168.1.1"
+    assert summary.wan_ip == "203.0.113.7"
+
+
+def test_devices_behind_the_gateway_have_no_wan_ip() -> None:
+    """Switches and APs report no WAN address at all."""
+    assert device_summary({"type": "usw", "ip": "192.168.1.170"}).wan_ip == ""

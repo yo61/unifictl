@@ -38,3 +38,4 @@ class DeviceSummary:
     type: str
     mac: str
     ip: str
+    wan_ip: str = ""

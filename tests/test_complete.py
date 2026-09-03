@@ -203,7 +203,7 @@ def test_set_lag_flag_names(run) -> None:
 
 
 def test_list_devices_flag_names(run) -> None:
-    assert run("unifictl", "list", "devices", "-") == ["--json"]
+    assert run("unifictl", "list", "devices", "-") == ["--json", "--wan"]
 
 
 def test_global_profile_flag_name(run) -> None:
