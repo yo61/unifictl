@@ -21,7 +21,14 @@ uv tool install unifictl        # or: pipx install unifictl
 unifictl set lag off            # dissolve the LAGs on the leader ports
 unifictl set lag on             # restore the LACP bonds
 unifictl set lag off --dry-run  # print the computed change, apply nothing
+
+unifictl list devices           # adopted devices and their LAN addresses
+unifictl list devices --wan     # add a WAN column; only gateways have one
+unifictl list devices --json    # raw controller device objects, for jq
 ```
+
+`list devices` reports LAN addresses throughout. A gateway's public address is
+its `WAN` column under `--wan`; every device behind it shows `-`.
 
 A real apply prints the diff, prompts for confirmation, and snapshots the
 switch's current `port_overrides` to a timestamped backup before writing.

@@ -101,7 +101,7 @@ _FLAG_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
     (): ("--profile",),
     ("set", "lag"): ("--switch", "--leader", "--dry-run", "--yes"),
     ("show", "port"): ("--switch", "--json"),
-    ("list", "devices"): ("--json",),
+    ("list", "devices"): ("--json", "--wan"),
     ("completion", "install"): ("--shell", "--dest"),
     ("profile", "delete"): ("--yes",),
     ("credential", "set"): ("--stdin",),
