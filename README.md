@@ -119,5 +119,31 @@ task dev:check          # lint, format-check, typecheck, import boundaries, test
 task dev:hooks-install  # install git hooks (prek)
 ```
 
-See `SPEC.md` for the build reference and `decisions/` for the architecture
-decision records.
+### Commit workflow
+
+This repo rebase-merges — squash and merge-commit are disabled. Every commit you
+push lands on `main` and becomes a changelog line, because release-please reads
+each commit subject to choose the changelog section and the version bump. Write
+commit subjects as release notes.
+
+Fold review fixes into the commit they correct rather than adding follow-ups:
+
+```sh
+git commit --fixup <sha>             # mark it; use a SHA or HEAD~n, not ':/text'
+git rebase -i --autosquash origin/main  # fold each marked commit into its target
+git push --force-with-lease          # if the branch was already pushed
+```
+
+Worth setting once:
+
+```sh
+git config --global rebase.autoSquash true  # -i autosquashes without being asked
+git config --global rebase.autoStash true   # survives a dirty working tree
+```
+
+CI rejects any commit whose subject starts `fixup!`, `squash!`, `amend!`, or
+`wip`, so uncurated history cannot reach `main`.
+
+See `SPEC.md` for the build reference, `decisions/` for the architecture
+decision records, `quality/criteria.md` for the checks a change is evaluated
+against, and `CLAUDE.md` for the same workflow written for coding agents.
