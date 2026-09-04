@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/yo61/unifictl/compare/v0.5.4...v0.5.5) (2026-09-04)
+
+
+### Dependencies
+
+* bump the uv-minor-patch group across 1 directory with 3 updates ([c2508b2](https://github.com/yo61/unifictl/commit/c2508b22ee84f83d65af86ae76f46547ca57d471))
+
 ## [0.5.4](https://github.com/yo61/unifictl/compare/v0.5.3...v0.5.4) (2026-09-03)
 
 
