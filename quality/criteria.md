@@ -201,12 +201,14 @@ through `tail` masked a non-zero exit. 2026-09-03 — `dev:check` exited 201 at
     - Commit bodies describe what the code does now, in plain language — no
       "critical", "robust", "comprehensive"; no discarded alternatives.
 
-## Severity: warning
+## Severity: blocking
 
 ## Source: global standards; release-please-config.json;
 decisions/2026-09-03-rebase-only-merge-policy.md. 2026-09-03 — the gateway fix
 and `--wan` were split into two commits, then squash-merged, so 0.5.4 recorded
 the feature under `Bug Fixes` with a patch bump. The repo moved to rebase-only
-merges in response.
+merges in response. Raised from `warning` to `blocking` on 2026-09-04: a miss
+here mislabels a release and bumps the wrong version, and while `CHANGELOG.md`
+can be corrected in a follow-up, a published tag cannot.
 
 ## Last triggered: 2026-09-03
