@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.5](https://github.com/yo61/unifictl/compare/v0.5.4...v0.5.5) (2026-09-11)
+
+
+### Dependencies
+
+* bump cyclopts from 4.23.3 to 4.24.0 in the uv-production group ([3d12232](https://github.com/yo61/unifictl/commit/3d122324a6d0f55e40fc32c0f0e9caa076b6c068))
+* bump https://github.com/woodruffw/zizmor-pre-commit ([b9c2062](https://github.com/yo61/unifictl/commit/b9c2062e103c2d8665b9bbd0053d0e3f22adefe4))
+* bump the uv-minor-patch group across 1 directory with 3 updates ([c2508b2](https://github.com/yo61/unifictl/commit/c2508b22ee84f83d65af86ae76f46547ca57d471))
+* bump the uv-minor-patch group with 3 updates ([ca392af](https://github.com/yo61/unifictl/commit/ca392afdd0c0e222abd1a658662d4b388f5cc4ef))
+* bump zizmorcore/zizmor-action in the actions-minor-patch group ([318f1a4](https://github.com/yo61/unifictl/commit/318f1a466c8968ba60886338c92a6f8db982773c))
+
 ## [0.5.4](https://github.com/yo61/unifictl/compare/v0.5.3...v0.5.4) (2026-09-03)
 
 
