@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.6](https://github.com/yo61/unifictl/compare/v0.5.5...v0.5.6) (2026-09-19)
+
+
+### Dependencies
+
+* bump anyio from 4.14.1 to 4.14.2 ([190cf96](https://github.com/yo61/unifictl/commit/190cf9630dcb71a9ed7505f7e65bd1a14e68e773))
+* bump cyclopts from 4.24.0 to 4.25.2 in the uv-production group ([c0cd954](https://github.com/yo61/unifictl/commit/c0cd954ea8babf6f4766990392d275ddfae2ae6d))
+
 ## [0.5.5](https://github.com/yo61/unifictl/compare/v0.5.4...v0.5.5) (2026-09-11)
 
 
