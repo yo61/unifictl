@@ -29,8 +29,10 @@ tasks:
   dev:fmt-check:
     desc: Check formatting without rewriting
     summary: >-
-      Fails if anything is unformatted, without touching a file — the form dev:check and the hooks
-      use, so a dirty tree cannot pass silently.
+      Fails if anything is unformatted, without touching a file — the form dev:check runs. Note
+      the pre-commit hook does NOT use this form: it runs `ruff format` with no --check, so it
+      rewrites the file and then reports the hook as failed. So a commit can reformat under you;
+      this task is the one that only reports.
     cmds:
       - uv run ruff format --check src tests
 
