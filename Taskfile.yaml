@@ -62,9 +62,13 @@ tasks:
   #      `command -v` covers the case where uv is not mise-managed at all.
   uv:lock:
     desc: 'Re-lock uv.lock; the only command that should change it'
-    summary: |
-      Re-lock uv.lock. The only command that should change it; UV_FROZEN is "1"
-      elsewhere so nothing rewrites the lockfile as a side effect.
+    summary: >-
+      The only command that changes uv.lock. UV_FROZEN="1" is set in the Taskfile env block and
+      again in mise.toml, so every other uv call here resolves against the lockfile and cannot
+      rewrite it as a side effect — a deliberate bump comes through this task. Making that work
+      takes both halves of the command: a task-level env: cannot override a variable already in
+      the OS environment, hence `env -u`, and a mise shim would re-derive UV_FROZEN inside the
+      child process, hence `mise which uv` to reach the real binary.
     cmds:
       - env -u UV_FROZEN "$(mise which uv 2>/dev/null || command -v uv)" lock
 
