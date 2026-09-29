@@ -12,36 +12,61 @@ tasks:
 
   dev:lint:
     desc: Run ruff check
+    summary: >-
+      ruff check over src and tests. It reports and does not fix; there is no --fix here, so a
+      lint failure is yours to resolve.
     cmds:
       - uv run ruff check src tests
 
   dev:fmt:
     desc: Apply ruff format
+    summary: >-
+      ruff format over src and tests, rewriting files in place. dev:fmt-check is the same rules
+      without the rewrite, and that is what the gate runs.
     cmds:
       - uv run ruff format src tests
 
   dev:fmt-check:
     desc: Check formatting without rewriting
+    summary: >-
+      Fails if anything is unformatted, without touching a file — the form dev:check and the hooks
+      use, so a dirty tree cannot pass silently.
     cmds:
       - uv run ruff format --check src tests
 
   dev:typecheck:
     desc: Run ty type checker
+    summary: >-
+      ty over src only. Note the asymmetry with dev:lint, which also covers tests: a type error in
+      a test is not caught here, or anywhere else in the gate.
     cmds:
       - uv run ty check src
 
   dev:imports:
     desc: Enforce import boundaries (import-linter)
+    summary: >-
+      Enforces the two import-linter contracts in pyproject: infrastructure may import neither
+      domain nor application, so the private-API client stays isolated and keeps mirroring
+      unifi-mcp's documented contract; and the DDD layering commands -> application -> domain,
+      where a higher layer may import a lower one but never the reverse. This catches the kind of
+      coupling that type-checks and tests both pass.
     cmds:
       - uv run lint-imports
 
   dev:test:
     desc: Run the pytest suite
+    summary: >-
+      pytest with no arguments, so pyproject decides: testpaths is tests and --strict-markers is
+      on, which means an unregistered marker is an error rather than a warning.
     cmds:
       - uv run pytest
 
   dev:check:
     desc: Full quality gate — lint, format-check, typecheck, imports, tests
+    summary: >-
+      The whole gate in order: lint, format-check, typecheck, imports, tests. It stops at the
+      first failure, so a later stage can still be broken once an earlier one passes. It uses
+      fmt-check rather than fmt, so it never rewrites a file.
     cmds:
       - task: dev:lint
       - task: dev:fmt-check
@@ -74,10 +99,16 @@ tasks:
 
   dev:hooks:
     desc: Run all prek hooks against every file
+    summary: >-
+      Runs every prek hook against every file, not just the staged ones — the way to check the
+      whole tree before pushing, rather than what a commit would check.
     cmds:
       - prek run --all-files
 
   dev:hooks-install:
     desc: Install git hooks (pre-commit, commit-msg, pre-push)
+    summary: >-
+      Installs the pre-commit, commit-msg and pre-push hooks. Run once per clone; nothing else
+      here does it for you.
     cmds:
       - prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
