@@ -40,6 +40,13 @@ def test_main_maps_config_error_to_exit_1(monkeypatch: pytest.MonkeyPatch) -> No
     assert exc.value.code == 1
 
 
+def test_main_exits_2_on_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["unifictl", "list", "--no-such-flag"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+
+
 def test_completion_zsh_registered(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         app(["completion", "zsh"])
