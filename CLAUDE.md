@@ -78,4 +78,5 @@ means typecheck, imports, and tests never ran; re-run after fixing.
 
 - `decisions/` — one architecture decision record per choice
 - `quality/criteria.md` — the pre-completion gate
+- `knowledge/INDEX.md` — routes to per-domain facts, hypotheses, and rules
 - `SPEC.md` — build reference
