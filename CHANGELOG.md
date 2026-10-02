@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.6](https://github.com/yo61/unifictl/compare/v0.5.5...v0.5.6) (2026-10-02)
+
+
+### Bug Fixes
+
+* **cli:** exit 2 on usage errors instead of 1 ([92a8ffd](https://github.com/yo61/unifictl/commit/92a8ffddb26a9f1446e85afe8038a634220292a0))
+
+
+### Dependencies
+
+* bump anyio from 4.14.1 to 4.14.2 ([190cf96](https://github.com/yo61/unifictl/commit/190cf9630dcb71a9ed7505f7e65bd1a14e68e773))
+* bump cyclopts from 4.24.0 to 4.25.2 in the uv-production group ([c0cd954](https://github.com/yo61/unifictl/commit/c0cd954ea8babf6f4766990392d275ddfae2ae6d))
+* bump cyclopts from 4.25.2 to 5.0.0 ([6bcb8e3](https://github.com/yo61/unifictl/commit/6bcb8e3f1db996af6b743e7030de8ab406d2fb24))
+* bump xdg-base-dirs from 6.0.2 to 6.0.3 in the uv-production group ([7d386db](https://github.com/yo61/unifictl/commit/7d386db5607e8e2ba0cca262f1cdf60ac30d08d1))
+
 ## [0.5.5](https://github.com/yo61/unifictl/compare/v0.5.4...v0.5.5) (2026-09-11)
 
 
