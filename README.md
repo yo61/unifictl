@@ -33,6 +33,17 @@ its `WAN` column under `--wan`; every device behind it shows `-`.
 A real apply prints the diff, prompts for confirmation, and snapshots the
 switch's current `port_overrides` to a timestamped backup before writing.
 
+### Exit codes
+
+| Exit | Meaning |
+|------|---------|
+| 0 | Success, including `--dry-run` and a declined confirmation prompt |
+| 1 | The command failed: missing config or key, device not found, or API error |
+| 2 | Usage error: unknown command or flag, missing or invalid argument |
+
+Usage errors exited `1` up to 0.5.5. A script that tests for `1` specifically
+should test for non-zero instead.
+
 ## Shell completion
 
 `unifictl` ships bash, zsh, and fish completion. The Homebrew formula installs
