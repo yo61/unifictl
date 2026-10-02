@@ -86,8 +86,8 @@ shows per-port before → after for the affected ports only.
 
 | Exit | Meaning |
 |------|---------|
-| 0 | Applied, or dry-run printed, or user declined a no-op |
-| 1 | Config/secret missing, device not found, API error, or user declined the write |
+| 0 | Applied, or dry-run printed, or user declined the write |
+| 1 | Config/secret missing, device not found, or API error |
 | 2 | Usage error: unknown command or flag, missing or invalid argument |
 
 ## 3. Project structure
