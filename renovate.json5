@@ -1,0 +1,63 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  // Two bots update this repository, each owning different pins. Dependabot keeps uv, the
+  // workflows' action SHAs and the pre-commit hooks (.github/dependabot.yml). Renovate owns the
+  // runner image, .python-version, mise.toml and the annotated *_VERSION values in the
+  // workflows, and the commitlint hook's config package. enabledManagers keeps it off
+  // everything Dependabot owns; github-actions runs only for runner images. Renovate runs from
+  // yo61/infrastructure's workflow, whose cron is the only schedule; do not add a `schedule`.
+  extends: ["config:recommended", "customManagers:githubActionsVersions"],
+  enabledManagers: ["github-actions", "pyenv", "mise", "custom.regex"],
+
+  // Policy shared by every repository Renovate updates; keep the copies alike.
+  semanticCommits: "enabled",
+  dependencyDashboard: true,
+  minimumReleaseAge: "7 days",
+  minimumReleaseAgeBehaviour: "timestamp-optional",
+  prHourlyLimit: 0,
+  prConcurrentLimit: 10,
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    semanticCommitType: "fix",
+    labels: ["security"],
+  },
+
+  packageRules: [
+    {
+      matchUpdateTypes: ["major"],
+      minimumReleaseAge: "14 days",
+    },
+    {
+      // Action SHAs are Dependabot's; only runs-on images are Renovate's.
+      matchManagers: ["github-actions"],
+      matchDatasources: ["!github-runners"],
+      enabled: false,
+    },
+    {
+      // uv is a range on purpose (pyproject.toml's required-version), moved by hand.
+      matchManagers: ["mise"],
+      matchDepNames: ["uv"],
+      enabled: false,
+    },
+    {
+      // CI's task and mise.toml's task move together.
+      matchDepNames: ["go-task/task", "task"],
+      groupName: "task",
+    },
+    {
+      matchFileNames: [".github/workflows/**"],
+      semanticCommitScope: "ci",
+    },
+  ],
+
+  customManagers: [
+    {
+      // The commitlint hook's config package, in additional_dependencies.
+      customType: "regex",
+      managerFilePatterns: ["/^\\.pre-commit-config\\.yaml$/"],
+      matchStrings: ['"(?<depName>@commitlint/config-conventional)@(?<currentValue>[0-9.]+)"'],
+      datasourceTemplate: "npm",
+    },
+  ],
+}

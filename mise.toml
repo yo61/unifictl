@@ -1,11 +1,13 @@
 [tools]
+# Exact, and Renovate moves each one; task moves with CI's TASK_VERSION as one group. uv is a
+# range on purpose: see required-version in pyproject.toml.
 uv = "0.12"
-task = "3"
-node = "22"
+task = "3.54.0"
+node = "22.23.3"
 # The bundled bash completion script is linted by pre-commit; provision the
 # linters here so the hooks find them without a separate manual install.
-shellcheck = "0.11"
-shfmt = "3.14"
+shellcheck = "0.11.0"
+shfmt = "3.14.1"
 
 [env]
 # Stop ad-hoc `uv run`/`uv sync` from rewriting uv.lock as a side effect. This
