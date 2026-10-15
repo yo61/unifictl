@@ -186,17 +186,12 @@ through `tail` masked a non-zero exit. 2026-09-03 — `dev:check` exited 201 at
 ## Criteria:
 
     - Conventional Commits, imperative mood, subject <= 72 chars; commitlint
-      passes for **every** commit in the PR, not just the tip.
-    - The repo rebase-merges, so each commit lands on `main` and becomes a
-      changelog line release-please parses from its **subject**. Every commit
-      must therefore stand alone as release notes; a fix and a feature in one
-      PR give both a `Bug Fixes` and a `Features` entry with the right bump.
-    - Fixups are squashed before merge (`git commit --fixup`, then
-      `git rebase -i --autosquash`). The `commit-hygiene` CI job rejects
-      `fixup!`/`squash!`/`amend!`/`wip` subjects; it cannot judge whether a
-      well-formed commit is worth publishing, so that check stays manual.
-    - Curating toward fewer, larger commits is a changelog concern, not only a
-      review one — six commits for one feature means six release-note lines.
+      passes for **every** commit in the PR, not just the tip, and the PR title
+      follows the same rules.
+    - The repo squash-merges, so the **PR title** becomes the commit subject
+      release-please parses: it must be Conventional Commits and read as a
+      release note. A fix and a feature in one PR lose one of the two from the
+      changelog; split them into separate PRs.
     - Never commit directly to `main`; never push to `main`.
     - Commit bodies describe what the code does now, in plain language — no
       "critical", "robust", "comprehensive"; no discarded alternatives.
@@ -204,11 +199,11 @@ through `tail` masked a non-zero exit. 2026-09-03 — `dev:check` exited 201 at
 ## Severity: blocking
 
 ## Source: global standards; release-please-config.json;
+decisions/2026-10-15-squash-merge-like-every-other-repo.md, which supersedes
 decisions/2026-09-03-rebase-only-merge-policy.md. 2026-09-03 — the gateway fix
-and `--wan` were split into two commits, then squash-merged, so 0.5.4 recorded
-the feature under `Bug Fixes` with a patch bump. The repo moved to rebase-only
-merges in response. Raised from `warning` to `blocking` on 2026-09-04: a miss
-here mislabels a release and bumps the wrong version, and while `CHANGELOG.md`
-can be corrected in a follow-up, a published tag cannot.
+and `--wan` were squash-merged in one PR, so 0.5.4 recorded the feature under
+`Bug Fixes` with a patch bump; under squash that is avoided by one PR per
+changelog line. Blocking since 2026-09-04: a miss mislabels a release, and a
+published tag cannot be corrected.
 
 ## Last triggered: 2026-09-03
