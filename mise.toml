@@ -3,9 +3,11 @@ uv = "0.12"
 task = "3"
 node = "22"
 # The bundled bash completion script is linted by pre-commit; provision the
-# linters here so the hooks find them without a separate manual install.
-shellcheck = "0.11"
-shfmt = "3.14"
+# linters here so the hooks find them without a separate manual install. CI's
+# lint job installs these two from here, so they are exact: Renovate's mise
+# manager opens a PR per release.
+shellcheck = "0.11.0"
+shfmt = "3.14.1"
 
 [env]
 # Stop ad-hoc `uv run`/`uv sync` from rewriting uv.lock as a side effect. This
