@@ -2,10 +2,11 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
 
   // Dependabot keeps the action SHAs, uv dependencies and pre-commit hooks
-  // (.github/dependabot.yml). Renovate owns only the annotated *_VERSION values CI installs,
-  // so only custom.regex runs.
+  // (.github/dependabot.yml), and supports neither mise.toml nor annotated workflow values.
+  // Renovate owns the annotated *_VERSION values CI installs (custom.regex) and the two
+  // mise.toml tools CI installs (mise; the rest of mise.toml is off in packageRules).
   extends: ["config:recommended", "customManagers:githubActionsVersions"],
-  enabledManagers: ["custom.regex"],
+  enabledManagers: ["custom.regex", "mise"],
 
   // Policy shared by every repository Renovate updates; keep the copies alike.
   semanticCommits: "enabled",
@@ -28,6 +29,12 @@
     {
       matchFileNames: [".github/workflows/**"],
       semanticCommitScope: "ci",
+    },
+    {
+      // CI installs only these two from mise.toml; it gets uv and task from their setup actions.
+      matchManagers: ["mise"],
+      matchDepNames: ["!shellcheck", "!shfmt"],
+      enabled: false,
     },
   ],
 }

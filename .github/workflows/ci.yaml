@@ -31,13 +31,12 @@ jobs:
       # The ruff, ty and import-linter hooks are `uv run --no-sync`, so the venv must exist
       # before prek runs.
       - run: uv sync --locked
-      # shellcheck is preinstalled on the runner; shfmt is not. Installing it through Go (also
-      # preinstalled) avoids another action to SHA-pin. The version matches mise.toml's shfmt.
-      - name: Install shfmt
-        run: |
-          set -euo pipefail
-          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      # shellcheck and shfmt at the versions mise.toml pins, so CI and local hooks run the same
+      # binaries. uv comes from setup-uv; env: false keeps mise.toml's [env] out of later steps.
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+        with:
+          install_args: shellcheck shfmt
+          env: false
       # Runs the hooks from .pre-commit-config.yaml rather than repeating them here, so local
       # and CI cannot drift. zizmor is skipped: it has its own job. commitlint is a commit-msg
       # hook and pytest a pre-push one, so --all-files skips both; the Conventional Commits job
