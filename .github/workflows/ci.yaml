@@ -13,6 +13,43 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # No python-version: uv takes it from .python-version, the one pin.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          # Distinguishes this job's cache key from the matrix job on the same Python. Without
+          # it both race on the same key and one fails to save.
+          cache-suffix: lint
+      # The ruff, ty and import-linter hooks are `uv run --no-sync`, so the venv must exist
+      # before prek runs.
+      - run: uv sync --locked
+      # shellcheck is preinstalled on the runner; shfmt is not. Installing it through Go (also
+      # preinstalled) avoids another action to SHA-pin. The version matches mise.toml's shfmt.
+      - name: Install shfmt
+        run: |
+          set -euo pipefail
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      # Runs the hooks from .pre-commit-config.yaml rather than repeating them here, so local
+      # and CI cannot drift. zizmor is skipped: it has its own job. commitlint is a commit-msg
+      # hook and pytest a pre-push one, so --all-files skips both; the Conventional Commits job
+      # and check-matrix cover them.
+      - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204  # v3.0.1
+        env:
+          SKIP: zizmor
+          # renovate: datasource=github-releases depName=j178/prek extractVersion=^v(?<version>.+)$
+          PREK_VERSION: 0.5.5
+        with:
+          prek-version: ${{ env.PREK_VERSION }}
+
   check-matrix:
     name: py${{ matrix.python-version }}
     runs-on: ubuntu-latest
@@ -41,12 +78,13 @@ jobs:
 
   check:
     name: Lint, typecheck, test
-    needs: check-matrix
+    # The ruleset requires this name, so lint rolls up here rather than as a new required check.
+    needs: [lint, check-matrix]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - if: needs.check-matrix.result != 'success'
+      - if: needs.lint.result != 'success' || needs.check-matrix.result != 'success'
         run: exit 1
 
   commitlint:
