@@ -38,14 +38,16 @@ jobs:
           install_args: shellcheck shfmt
           env: false
       # Runs the hooks from .pre-commit-config.yaml rather than repeating them here, so local
-      # and CI cannot drift. zizmor is skipped: it has its own job. commitlint is a commit-msg
-      # hook and pytest a pre-push one, so --all-files skips both; the Conventional Commits job
-      # and check-matrix cover them.
+      # and CI cannot drift. commitlint is a commit-msg hook and pytest a pre-push one, so
+      # --all-files skips both; the Conventional Commits job and check-matrix cover them.
       - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204  # v3.0.1
         env:
-          SKIP: zizmor
           # renovate: datasource=github-releases depName=j178/prek extractVersion=^v(?<version>.+)$
           PREK_VERSION: 0.5.5
+          # jactionlint's online rules (yo61/global decisions/2026-10-17-retire-zizmor.md); local
+          # hooks stay offline.
+          JACTIONLINT_ONLINE: 1
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           prek-version: ${{ env.PREK_VERSION }}
 
@@ -105,19 +107,3 @@ jobs:
       - uses: yo61/commitlint-github-action@501ff7bb31eb7133c871318c877d0e43cd1ff500  # v6.3.0 (digest-pinned)
         with:
           configFile: commitlint.config.mjs
-
-  zizmor:
-    name: zizmor
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
-        with:
-          advanced-security: false
-          persona: regular
-          version: v1.26.1
