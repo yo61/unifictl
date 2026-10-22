@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.7](https://github.com/yo61/unifictl/compare/v0.5.6...v0.5.7) (2026-10-22)
+
+
+### Dependencies
+
+* bump certifi from 2026.6.17 to 2026.10.19 ([#88](https://github.com/yo61/unifictl/issues/88)) ([8e0adf9](https://github.com/yo61/unifictl/commit/8e0adf9bea13da02da712f066841c83931b50105))
+* bump cyclopts from 5.0.0 to 5.1.1 in the uv-production group ([0554923](https://github.com/yo61/unifictl/commit/0554923e8bbd1bb5e2a74ad2ff8aad28baba19af))
+* bump cyclopts from 5.1.1 to 5.2.0 in the uv-production group ([#76](https://github.com/yo61/unifictl/issues/76)) ([0559eae](https://github.com/yo61/unifictl/commit/0559eae7cdee08e0635eaa64f32efdf99e190803))
+
 ## [0.5.6](https://github.com/yo61/unifictl/compare/v0.5.5...v0.5.6) (2026-10-02)
 
 
