@@ -22,7 +22,7 @@ jobs:
         with:
           persist-credentials: false
       # No python-version: uv takes it from .python-version, the one pin.
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           # Distinguishes this job's cache key from the matrix job on the same Python. Without
@@ -33,7 +33,7 @@ jobs:
       - run: uv sync --locked
       # shellcheck and shfmt at the versions mise.toml pins, so CI and local hooks run the same
       # binaries. uv comes from setup-uv; env: false keeps mise.toml's [env] out of later steps.
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8  # v5.1.2
         with:
           install_args: shellcheck shfmt
           env: false
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
