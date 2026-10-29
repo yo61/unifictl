@@ -168,7 +168,7 @@ jobs:
           # API below -- so the App token has no reason to persist in .git/config.
           persist-credentials: false
       - if: steps.pr_branch.outputs.branch != ''
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           python-version: "3.11"
           enable-cache: false
@@ -264,12 +264,12 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           python-version: "3.11"
           enable-cache: false
       - run: uv build
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
 
   # Tell the yo61/homebrew-tap repo to bump its unifictl formula to the
   # version we just published to PyPI. The tap's `bump-unifictl` workflow
