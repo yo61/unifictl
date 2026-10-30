@@ -22,7 +22,7 @@ jobs:
         with:
           persist-credentials: false
       # No python-version: uv takes it from .python-version, the one pin.
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           enable-cache: true
           # Distinguishes this job's cache key from the matrix job on the same Python. Without
@@ -33,14 +33,14 @@ jobs:
       - run: uv sync --locked
       # shellcheck and shfmt at the versions mise.toml pins, so CI and local hooks run the same
       # binaries. uv comes from setup-uv; env: false keeps mise.toml's [env] out of later steps.
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8  # v5.1.2
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550  # v5.2.2
         with:
           install_args: shellcheck shfmt
           env: false
       # Runs the hooks from .pre-commit-config.yaml rather than repeating them here, so local
       # and CI cannot drift. commitlint is a commit-msg hook and pytest a pre-push one, so
       # --all-files skips both; the Conventional Commits job and check-matrix cover them.
-      - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204  # v3.0.1
+      - uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d  # v3.1.0
         env:
           # renovate: datasource=github-releases depName=j178/prek extractVersion=^v(?<version>.+)$
           PREK_VERSION: 0.5.7
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
