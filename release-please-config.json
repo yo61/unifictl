@@ -66,6 +66,7 @@
       "hidden": true
     }
   ],
+  "exclude-paths": ["knowledge", "decisions", "quality"],
   "packages": {
     ".": {
       "package-name": "unifictl",
