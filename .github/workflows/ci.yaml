@@ -33,7 +33,7 @@ jobs:
       - run: uv sync --locked
       # shellcheck and shfmt at the versions mise.toml pins, so CI and local hooks run the same
       # binaries. uv comes from setup-uv; env: false keeps mise.toml's [env] out of later steps.
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d  # v5.2.4
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c  # v5.2.6
         with:
           install_args: shellcheck shfmt
           env: false
@@ -104,6 +104,6 @@ jobs:
       # commit to master since 2025-01-14, and it pins @commitlint/ensure ^19,
       # two majors behind. This fork runs commitlint v21 on node 26, and pins its
       # runtime image by digest so the SHA pin here cannot be worked around.
-      - uses: yo61/commitlint-github-action@80080805b3e239db44e1f181dfdb74824bdd2c91  # v7.1.0
+      - uses: yo61/commitlint-github-action@a7939ec6b16df871abcc3de81d1871da247f78a9  # v7.1.1
         with:
           configFile: commitlint.config.mjs
