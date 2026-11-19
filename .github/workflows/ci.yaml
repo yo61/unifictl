@@ -33,7 +33,7 @@ jobs:
       - run: uv sync --locked
       # shellcheck and shfmt at the versions mise.toml pins, so CI and local hooks run the same
       # binaries. uv comes from setup-uv; env: false keeps mise.toml's [env] out of later steps.
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c  # v5.2.6
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
         with:
           install_args: shellcheck shfmt
           env: false
